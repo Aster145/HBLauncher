@@ -83,23 +83,6 @@ void main() {
     vec2 local=arrow-tip;
     float head=fill(max(max(local.y-5.0,-local.y*.5+local.x*.866-5.0),-local.y*.5-local.x*.866-5.0));
     col=mix(col,vec3(1),max(arc,head)*.95);
-    // Music on/off, beside refresh. The slash reflects the actual toggle request.
-    vec2 speaker=p-vec2(1490,179);
-    col=mix(col,vec3(.70,.95,1),line(length(speaker)-65.0,1.2)*.60);
-    const vec2 outline[7]=vec2[7](vec2(-3,-21),vec2(-18,-9),vec2(-27,-9),vec2(-27,9),vec2(-18,9),vec2(-3,21),vec2(-3,-21));
-    float speakerStroke=1000.0;
-    for(int i=0;i<6;i++) speakerStroke=min(speakerStroke,stroke(speaker,outline[i],outline[i+1]));
-    col=mix(col,vec3(1),fill(speakerStroke-1.8)*.95);
-    if(c.library.z==0u) {
-        // Separate, round-ended 90-degree arcs leave a clear gap from the speaker.
-        float angle=clamp(atan(speaker.y,speaker.x),-.7853981634,.7853981634);
-        vec2 direction=vec2(cos(angle),sin(angle));
-        float rays=min(length(speaker-direction*16.0),length(speaker-direction*31.0));
-        col=mix(col,vec3(1),fill(rays-1.8)*.95);
-    } else {
-        vec2 slash=vec2(speaker.x+speaker.y,speaker.y-speaker.x)*.7071;
-        col=mix(col,vec3(1),fill(box(slash,vec2(0),vec2(36,2.2),2.0)));
-    }
     uint count=min(c.library.x,32u);
     if(count>0u) {
         col=mix(col,INK,text(p,vec2(302,437),TEXT_LIBRARY));

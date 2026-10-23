@@ -130,16 +130,15 @@ The internal RPC service listens on loopback and uses a per-session token.
 4. The Pico loads NS2, runs the bootstrap, issues `REMOVE`, and enters the fresh
    connection command. The expected `Out of memory` response to `REMOVE` is part
    of this sequence. Let it finish. The host checks the session, creates the
-   display, uploads the catalog/music, and starts the launcher.
+   display, uploads the catalog, and starts the launcher.
 5. Keep the host running and computer awake throughout the session.
 
 Use **D-pad Up/Down** or the **left stick** to select an app, then **A** to open it.
 You can also tap an app row. The top-right refresh control rescans the host's
-app folders; the speaker control toggles menu music. D-pad Left/Right do not
+app folders. D-pad Left/Right do not
 change the catalog.
 Joy-Con 2 optical movement controls the cursor; **L/R** clicks while the
-corresponding Joy-Con is tracking, and **ZR** also clicks a hovered row, Refresh,
-or the speaker. The cursor hides when optical tracking stops. The launcher has no separate System menu.
+corresponding Joy-Con is tracking, and **ZR** also clicks a hovered row or Refresh. The cursor hides when optical tracking stops. The launcher has no separate System menu.
 Hello World uses **B** or **Minus** to return to the menu. Other apps define their
 own controls and must implement a return action.
 
@@ -277,7 +276,7 @@ byte layout is the public contract.
 | 64–79 | `motion` | Example timing/UI values; `motion.x` is elapsed simulated seconds |
 | 80–95 | `state` | Example state; `state.y` holds previous buttons, `state.z` frame count |
 | 96–111 | `refresh` | Menu refresh bookkeeping; leave intact unless your app needs it |
-| 112–127 | `library` | Menu values; `library.z` at 120 preserves manual mute |
+| 112–127 | `library` | Menu values; `library.z` at 120 is reserved |
 | 128–783 | `touch[164]` | Touch input; overwritten every frame |
 | 784–959 | `game`, `piece`, `flow`, `bagMeta`, `bag`, `rows` | App-owned working state |
 | 960–975 | `transition` | `x`: fade opacity; other components reserved for transition conventions |
@@ -287,7 +286,7 @@ byte layout is the public contract.
 | 1024 onward | `atlas[]` | App data as 32-bit words; use your own packing convention |
 
 The host clears the full shared buffer when loading an app, copies initial state
-and data, preserves the user's mute flag, and clears launch/exit requests.
+and data, and clears launch/exit requests.
 App state is transient: there is no persistence/save API.
 
 ### Compute and exit
@@ -382,8 +381,7 @@ Icons are separate PNG files rasterized into the menu catalog on the PC. A
 
 ## Audio
 
-Menu music pauses while an app is active and resumes on return unless manually
-muted. An app can supply short sound effects:
+The launcher is silent. An app can supply short sound effects:
 
 ```json
 "audio": {
@@ -508,9 +506,7 @@ The Pico uses [Adafruit CircuitPython HID](https://github.com/adafruit/Adafruit_
 its MIT notice is included beside the vendored library. CircuitPython, Node.js,
 Khronos glslang/SPIRV-Tools, Vulkan, Pillow, and DejaVu provide the supporting tools.
 
-The included menu recording is **Homebrew Channel music** by **drmr**, from
-*dark waters*. Attribution does not relicense third-party music or upstream
-code. No blanket project license has been assigned here; retain third-party
+No blanket project license has been assigned here; retain third-party
 notices and resolve redistribution permissions before publishing a licensed
 release. Nintendo, SmileBASIC, and their trademarks belong to their respective
 owners; this is an independent project.

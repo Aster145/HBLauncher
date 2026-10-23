@@ -25,7 +25,7 @@ SmileBASIC imports and SDK definitions; it does not call arbitrary discoveries.
 | NFC | Enumerate readers, start/stop detection, read-only tag info | One handheld reader enumerated; detection accepted; no tag read |
 | Amiibo / NFP | Discovery only | `nfp:user` opens; no mount, reads of amiibo data or writes implemented |
 | IR camera | Handle/status query | Handheld handle returned status 1 (unsupported); no image capture verified |
-| Audio output | Existing music and per-app PCM effect path | Existing console playback and audio owners; see root README |
+| Audio output | Per-app PCM effect path | Existing console playback and audio owners; see root README |
 | Audio input | Device-name enumeration | `audin:u` opens; `ListAudioIns` returned `BuiltInHeadset`; recording untested |
 | TCP / DNS / TLS | Inventory only | Socket/TLS functions exist; `ssl` opens; no connection/handshake adapter or test |
 | Local wireless / Bluetooth | Inventory only | `ldn`, `bluetooth`, `btm` exports; no session/pairing APIs exposed |

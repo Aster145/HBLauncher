@@ -3,7 +3,7 @@ const catalogTools=require('./app-catalog.cjs');
 const {prepare}=require('./gpu-app.cjs');
 const check=(v,m)=>{if(!v)throw Error(m);};
 async function atomic(file,value){const temp=file+'.tmp';await fs.writeFile(temp,JSON.stringify(value,null,2));await fs.rename(temp,file);}
-async function create({rpc,menu,directory,prepareApp=prepare,beforeLaunch=async()=>{}}){
+async function create({rpc,menu,directory,prepareApp=prepare}){
  const mapped=menu.controls.mapped,cache=new Map();let generation=0,refreshSeen=0,menuState=await rpc.read(mapped,1024);
  let catalog,menuData;const runtime={active:null,report:{session:rpc.a.session,started:new Date().toISOString(),transitions:[],generation:0,resourcesRetained:true}};
  const save=()=>atomic(path.join(directory,'app-runtime.json'),runtime.report);
@@ -41,13 +41,12 @@ async function create({rpc,menu,directory,prepareApp=prepare,beforeLaunch=async(
   if(request!==0){
    menuState=state;const selected=catalog.apps[request-1];
    try{
-    await beforeLaunch();
     check(selected,'The selected app is no longer in the catalog');
     const app=await catalogTools.readApp(selected.root);check(app.fingerprint===selected.fingerprint,'App changed; tap Refresh before opening it');
     let gpu=cache.get(app.fingerprint);
     if(!gpu){check(cache.size<64,'This session has retained 64 app versions; start a fresh session to load another');gpu=await prepareApp(rpc,menu,app,directory);check(gpu.ready&&gpu.scratchRestored,'App preparation incomplete');cache.set(app.fingerprint,gpu);}
     const bytes=Buffer.alloc(menu.controls.bytes);app.files.state.bytes.copy(bytes);app.files.data.bytes.copy(bytes,1024);
-    bytes.writeUInt32LE(state.readUInt32LE(120),120);bytes.writeUInt32LE(0,1012);bytes.writeUInt32LE(0,1016);
+    bytes.writeUInt32LE(0,1012);bytes.writeUInt32LE(0,1016);
     if(app.manifest.transition==='none')bytes.writeFloatLE(0,960);
     if(app.files.memory){check(gpu.privateStorage?.bytes===app.files.memory.allocationBytes,'App private storage differs');const initial=Buffer.alloc(gpu.privateStorage.bytes);app.files.memory.bytes.copy(initial);await rpc.write(gpu.privateStorage.mapped,initial);}
     await rpc.write(mapped,bytes);await audio(app);

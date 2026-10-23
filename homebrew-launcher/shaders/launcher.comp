@@ -51,13 +51,11 @@ void main(){
     if(min(max(q.x,q.y),0.0)+length(max(q,0.0))-18.0<=0.0){c.state.x=index;if(click)launchSelection();}
    }
   }
-  if(click&&distance(c.flow.xy,vec2(1490,179))<=65.0)c.library.z=1u-c.library.z;
   if(click&&distance(c.flow.xy,vec2(1660,179))<=65.0&&c.refresh.x<=0.0){c.refresh.x=1.0;c.refresh.y=0.0;c.refresh.z+=1.0;}
  }
  bool touching=c.touch[2]==1u&&(c.touch[6]&2u)==0u;
  if(touching){
   vec2 p=vec2(c.touch[8],c.touch[9])*1.5;
-  if(c.library.w==0u&&distance(p,vec2(1490,179))<=65.0&&c.state.w==0u)c.library.z=1u-c.library.z;
   if(c.library.w==0u&&distance(p,vec2(1660,179))<=65.0&&c.state.w==0u&&c.refresh.x<=0.0){c.refresh.x=1.0;c.refresh.y=0.0;c.refresh.z+=1.0;}
   uint page=(c.state.x/3u)*3u;
   if(c.state.w==0u)for(uint row=0u;row<3u;row++){

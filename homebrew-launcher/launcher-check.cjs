@@ -58,12 +58,6 @@ async function main(directory,attempt=''){
    {name:'Right leaves an empty library empty',count:0,buttons:1<<14,selection:0,want:0,wantCount:0},
    {name:'Left does not change the catalog',installed:3,count:3,buttons:1<<12,selection:2,want:2,wantCount:3},
    {name:'Disconnected horizontal input ignored',connected:false,count:0,buttons:1<<14,selection:0,want:0,wantCount:0},
-   {name:'Tap music mutes',touch:[993,119],selection:0,want:0,wantMuted:1},
-   {name:'Tap music again unmutes',touch:[993,119],muted:1,selection:0,want:0},
-   {name:'Held music touch toggles once',touch:[993,119],selection:0,want:0,steps:5,wantMuted:1},
-   {name:'Music touch ending ignored',touch:[993,119],ending:true,selection:0,want:0},
-   {name:'Empty library can mute music',count:0,touch:[993,119],selection:0,want:0,wantMuted:1},
-   {name:'Modal blocks music toggle',touch:[993,119],modal:1,wantModal:1,selection:0,want:0},
    {name:'Installed app request waits for fade',installed:2,count:2,buttons:1,selection:1,want:1,steps:20,wantLaunch:2},
    {name:'More than one page wraps correctly',installed:5,count:5,buttons:1<<13,selection:0,want:4},
    {name:'Touch on second page selects global app index',installed:5,count:5,touch:[600,367],selection:4,want:3},
@@ -75,18 +69,18 @@ async function main(directory,attempt=''){
    input.writeFloatLE(test.cooldown||0,76);input.writeUInt32LE(test.selection,80);input.writeUInt32LE(test.previous||0,84);input.writeUInt32LE(test.modal||0,92);
    input.writeFloatLE(test.busy||0,96);input.writeFloatLE(test.requests||0,104);input.writeUInt32LE(test.heldTouch?1:0,124);
    input.writeUInt32LE(test.count===undefined?3:test.count,112);
-   input.writeUInt32LE(test.muted||0,120);
+   input.writeUInt32LE(test.reserved||0,120);
    input.writeUInt32LE(test.installed||0,1020);
    if(test.touch){input.writeUInt32LE(1,136);input.writeUInt32LE(test.ending?2:0,152);input.writeUInt32LE(test.touch[0],160);input.writeUInt32LE(test.touch[1],164);}
    await rpc.write(prep.controls.mapped,input);
    for(let step=0;step<(test.steps||1);step++){await ok('vkQueueSubmit',queue,1,p+0x400,0);await ok('vkQueueWaitIdle',queue);}
    const result=await rpc.read(prep.controls.mapped+64,64),selection=result.readUInt32LE(16),modal=result.readUInt32LE(28),frames=result.readUInt32LE(24);
    const refresh={remaining:result.readFloatLE(32),angle:result.readFloatLE(36),requests:result.readFloatLE(40),completions:result.readFloatLE(44)};
-   const library={count:result.readUInt32LE(48),preview:result.readUInt32LE(52),muted:result.readUInt32LE(56)};
+   const library={count:result.readUInt32LE(48),preview:result.readUInt32LE(52),reserved:result.readUInt32LE(56)};
    const launch=test.wantLaunch===undefined?null:(await rpc.read(prep.controls.mapped+1012,4)).readUInt32LE();
    const passed=(test.wantLaunch===undefined||launch===test.wantLaunch)&&selection===test.want&&result.readFloatLE(4)===selection&&modal===(test.wantModal||0)&&frames===(test.steps||1)&&result.readFloatLE()>0&&
     (refresh.remaining>0)===!!test.wantBusy&&refresh.requests===(test.wantRequests||0)&&refresh.completions===(test.wantCompletions||0)&&
-    (test.wantBusy?refresh.angle>0:refresh.angle===0)&&library.muted===(test.wantMuted||0)&&
+    (test.wantBusy?refresh.angle>0:refresh.angle===0)&&library.reserved===(test.wantReserved||0)&&
     library.count===(test.wantCount===undefined?(test.count===undefined?3:test.count):test.wantCount)&&library.preview===(test.wantPreview||0);
    report.cases.push({name:test.name,selection,modal,frames,refresh,library,passed});await save();check(passed,'GPU launcher check failed: '+test.name);
   }

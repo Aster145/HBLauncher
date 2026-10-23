@@ -130,11 +130,10 @@ loopback only.
 
 - D-pad **Up/Down** or the left stick selects an app; **A** opens it.
 - Touch an app row to launch it. Touch Refresh to rescan `apps/`.
-- Touch the speaker to toggle menu music.
 - Put either detached Joy-Con 2 into optical mouse position to move the cursor.
   **L** clicks while the left Joy-Con tracks; **R** clicks while the right tracks.
   Each mouse works with the other Joy-Con still attached.
-  These clicks work on app rows, the speaker and Refresh. **ZR** is also a click.
+  These clicks work on app rows and Refresh. **ZR** is also a click.
 - The cursor hides when neither optical sensor reports active tracking.
 - Hello World returns to the launcher with **B** or **Minus**.
 - D-pad Left/Right do not enable any debug catalog or preview mode.

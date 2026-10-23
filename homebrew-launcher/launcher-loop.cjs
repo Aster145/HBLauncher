@@ -20,19 +20,7 @@ async function main(directory,attempt='',instance=''){
  const sdkImage=require('../smilebasic/reference/sdk-checks.cjs');
  let runtime;
  let sdkRuntime;
- // The music player exclusively owns audio queue mutations.
- let requestedMute;
- async function syncMusic(launching=false){
-  const manualMute=(await rpc.read(prepared.controls.mapped+120,4)).readUInt32LE()!==0;
-  const inGame=launching||runtime?.active!=null;
-  const muted=manualMute||inGame;
-  if(muted===requestedMute)return;
-  const request={session:rpc.a.session,muted,changed:new Date().toISOString()};
-  const file=path.join(directory,'music-request.json'),temp=file+'.tmp';
-  await fs.writeFile(temp,JSON.stringify(request,null,2));await fs.rename(temp,file);
-  requestedMute=muted;report.music={requestedMuted:muted,changed:request.changed};await save();
- }
- runtime=await require('./app-runtime.cjs').create({rpc,menu:prepared,directory,beforeLaunch:()=>syncMusic(true)});
+ runtime=await require('./app-runtime.cjs').create({rpc,menu:prepared,directory});
  for(const c of [...Object.values(code),timing.tick]){
   const expected=Buffer.from(c.bytes,'hex').subarray(0,256);await rpc.request({command:'verify-function',address:sdk+c.offset,hex:expected.toString('hex')});
  }
@@ -113,7 +101,7 @@ async function main(directory,attempt='',instance=''){
  try{
   await startWorker();console.log('HBLauncher continuous native frame loop running.');
   while(!await stopping()){
-   await new Promise(r=>setTimeout(r,50));await syncMusic();
+   await new Promise(r=>setTimeout(r,50));
    const state=await rpc.read(prepared.controls.mapped,1024),mailbox=await rpc.read(prepared.controls.mapped+0x7f0800,2052);
    const heartbeat=(await rpc.read(program.addresses.at(-1),8)).readBigUInt64LE();
    if(heartbeat&&heartbeat!==lastHeartbeat){

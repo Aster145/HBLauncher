@@ -5,8 +5,8 @@ test('Rescan, load, return, cache, removal and version reload use package data',
  await fs.cp(path.resolve(__dirname,'../apps/hello-world'),path.join(root,'hello-world'),{recursive:true});
  const capacity=8*1024*1024,memory=Buffer.alloc(capacity+4096),mapped=0x100000;memory.writeUInt32LE(1,112);memory.writeUInt32LE(1,1020);
  const rpc={a:{session:'test-session'},async read(p,n){assert.ok(p>=mapped&&p+n<=mapped+memory.length);return Buffer.from(memory.subarray(p-mapped,p-mapped+n));},async write(p,b){assert.ok(p>=mapped&&p+b.length<=mapped+memory.length);b.copy(memory,p-mapped);}};
- const prepared=[],menu={catalog:{root},controls:{mapped,bytes:capacity},commands:[['11','12','13']]};let musicPauses=0;
- const runtime=await create({rpc,menu,directory,beforeLaunch:async()=>{musicPauses++;},prepareApp:async(r,m,app)=>{assert.ok(musicPauses>prepared.length);prepared.push({id:app.id,bytes:app.files.compute.bytes.length});return {ready:true,scratchRestored:true,commands:[['21','22','23']],...(app.files.memory?{privateStorage:{mapped:mapped+capacity,bytes:4096}}:{})};}});
+ const prepared=[],menu={catalog:{root},controls:{mapped,bytes:capacity},commands:[['11','12','13']]};
+ const runtime=await create({rpc,menu,directory,prepareApp:async(r,m,app)=>{prepared.push({id:app.id,bytes:app.files.compute.bytes.length});return {ready:true,scratchRestored:true,commands:[['21','22','23']],...(app.files.memory?{privateStorage:{mapped:mapped+capacity,bytes:4096}}:{})};}});
  assert.equal(memory.readUInt32LE(112),1);assert.equal(runtime.report.catalog.apps[0].name,'Hello World');
  memory.writeUInt32LE(1,1012);assert.deepEqual(await runtime.afterBatch(),['21','22','23']);assert.equal(runtime.active.app.id,'hello-world');assert.equal(prepared.length,1);assert.equal(memory.readFloatLE(960),1);
  let audio=JSON.parse(await fs.readFile(path.join(directory,'game-audio-source.json')));assert.equal(audio.package.id,'hello-world');

@@ -8,7 +8,7 @@ async function main(){
  cases.push({name:'Launcher reaches black before posting the app request',installed:1,count:1,buttons:1,selection:0,want:0,steps:1,wantLaunch:0,wantFading:true});
  for(const [i,t]of cases.entries()){
   const b=Buffer.alloc(1024),steps=t.steps||1;
-  for(const [offset,value]of [[8,t.buttons],[32,t.connected===false?0:1],[80,t.selection],[84,t.previous],[92,t.modal],[112,t.count===undefined?3:t.count],[120,t.muted],[124,t.heldTouch?1:0],[1020,t.installed]])b.writeUInt32LE(value||0,offset);
+  for(const [offset,value]of [[8,t.buttons],[32,t.connected===false?0:1],[80,t.selection],[84,t.previous],[92,t.modal],[112,t.count===undefined?3:t.count],[120,t.reserved],[124,t.heldTouch?1:0],[1020,t.installed]])b.writeUInt32LE(value||0,offset);
   b.writeInt32LE(t.stick||0,20);b.writeFloatLE(t.cooldown||0,76);b.writeFloatLE(t.busy||0,96);b.writeFloatLE(t.requests||0,104);
   if(t.touch){b.writeUInt32LE(1,136);b.writeUInt32LE(t.ending?2:0,152);b.writeUInt32LE(t.touch[0],160);b.writeUInt32LE(t.touch[1],164);}
   const initial=path.join(directory,i+'-initial.bin'),input=path.join(directory,i+'-input.bin'),output=path.join(directory,i+'-output.bin');
@@ -18,7 +18,7 @@ async function main(){
    const r=await fs.readFile(output),u=o=>r.readUInt32LE(o),f=o=>r.readFloatLE(o);
    const passed=(!t.wantFading||f(964)===1)&&u(80)===t.want&&f(68)===t.want&&u(92)===(t.wantModal||0)&&u(88)===steps&&f(64)>0&&
     (f(96)>0)===!!t.wantBusy&&f(104)===(t.wantRequests||0)&&f(108)===(t.wantCompletions||0)&&
-    (t.wantBusy?f(100)>0:f(100)===0)&&u(120)===(t.wantMuted||0)&&u(116)===(t.wantPreview||0)&&
+    (t.wantBusy?f(100)>0:f(100)===0)&&u(120)===(t.wantReserved||0)&&u(116)===(t.wantPreview||0)&&
     u(112)===(t.wantCount===undefined?(t.count===undefined?3:t.count):t.wantCount)&&(t.wantLaunch===undefined||u(1012)===t.wantLaunch);
    report.cases.push({name:t.name,passed,selection:u(80),launch:u(1012)});
   }catch(error){report.cases.push({name:t.name,passed:false,error:error.message});}
