@@ -27,10 +27,11 @@ SmileBASIC imports and SDK definitions; it does not call arbitrary discoveries.
 | IR camera | Handle/status query | Handheld handle returned status 1 (unsupported); no image capture verified |
 | Audio output | Per-app PCM effect path | Existing console playback and audio owners; see root README |
 | Audio input | Device-name enumeration | `audin:u` opens; `ListAudioIns` returned `BuiltInHeadset`; recording untested |
-| TCP / DNS / TLS | Inventory only | Socket/TLS functions exist; `ssl` opens; no connection/handshake adapter or test |
+| TCP / FTP | Console listener, passive transfers, background service | TCP echo and FTP read/write round trips passed; one client; see [FTP](ftp.md) |
+| DNS / TLS | Inventory only | TLS symbols and `ssl` service present; no DNS/handshake adapter or test |
 | Local wireless / Bluetooth | Inventory only | `ldn`, `bluetooth`, `btm` exports; no session/pairing APIs exposed |
 | HID accessory bus | Discovery only | `hidbus` open returned raw Result `0x1015`; do not infer Ring-Con/accessory support |
-| Storage | App assets on host; existing package/private GPU memory | No new console filesystem API, save mounts or filesystem experiments |
+| Storage | Title-owned files through FTP; app assets on host | `save:/` and `tmp:/` read/write/commit verified; `rom:/` read-only; SD permission denied |
 | Time / threads / memory | Internal qualified native worker support | Existing timer, pthread and owned-buffer machinery; not a public CPU app runtime |
 | System applets, accounts, web, album | Inventory only | Linked functions/imports do not establish usable app APIs |
 | JIT / runtime modules | Inventory only | Export presence does not establish executable allocation or native app loading |

@@ -27,6 +27,8 @@ function stop(){
    if(!children.has(child))return;
    await new Promise(resolve=>{const timer=setTimeout(resolve,5000);child.once('close',()=>{clearTimeout(timer);resolve();});child.kill('SIGTERM');});
   }
+  // Close file-transfer handles and commit writes while RPC is still available.
+  await Promise.all([...children].filter(c=>c.script==='sdk/host/ftp-service.cjs').map(end));
   // Keep RPC alive until the audio owner has stopped its console output.
   await Promise.all([...children].filter(c=>/\/game-audio\.cjs$/.test(c.script)).map(end));
   await Promise.all([...children].filter(c=>c.script!=='smilebasic/host.cjs').map(end));
@@ -44,9 +46,10 @@ async function main(){
   for(const [script,...args] of stages)await start(script,[directory,...args]).done;
   const graphics=start('homebrew-launcher/launcher-loop.cjs',[directory,'auto'],'HBLauncher game event source ready.');
   await graphics.ready;
+  const ftp=start('sdk/host/ftp-service.cjs',[directory],'SDK FTP service ready.');await ftp.ready;
   const effects=start('homebrew-launcher/game-audio.cjs',[directory],'Game sound effects ready.');await effects.ready;
   console.log('HBLauncher GPU app runtime and package sound effects are running.');
-  await Promise.race([host.done,graphics.done,effects.done]);
+  await Promise.race([host.done,graphics.done,effects.done,ftp.done]);
  }finally{await stop();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

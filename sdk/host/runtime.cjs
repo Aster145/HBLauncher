@@ -2,6 +2,8 @@ const L=require('./layout.cjs');
 function validateManifest(value){
  if(value===undefined)return {capabilities:[],endpoints:[]};
  if(!value||value.version!==1||!Array.isArray(value.capabilities)||value.capabilities.some(x=>!['vibration','nfc','udp'].includes(x)))throw Error('Invalid SDK manifest');
+ const services=value.services??[];if(!Array.isArray(services)||services.some(s=>s!=='ftp'))throw Error('Invalid SDK background service');
+ if(value.ftpPort!==undefined&&(!Number.isInteger(value.ftpPort)||value.ftpPort<1024||value.ftpPort>65535))throw Error('Invalid FTP port');
  const endpoints=value.endpoints??[];if(!Array.isArray(endpoints)||endpoints.length>8)throw Error('SDK supports at most eight UDP endpoints');
  return {capabilities:[...new Set(value.capabilities)],endpoints:endpoints.map(require('./network.cjs').endpoint)};
 }

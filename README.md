@@ -518,3 +518,12 @@ No blanket project license has been assigned here; retain third-party
 notices and resolve redistribution permissions before publishing a licensed
 release. Nintendo, SmileBASIC, and their trademarks belong to their respective
 owners; this is an independent project.
+
+## FTP app
+
+[ftpd-sb](https://github.com/ravensclawx/ftpd-sb) is a separate app for transferring
+SmileBASIC files from a PC FTP client. It requires HBLauncher **v0.2.0 or newer**.
+Its release ZIP installs as `apps/ftpd-sb/`; refresh the launcher after copying.
+The SDK service starts with the host; open the app and press A to listen.
+`/save` and `/tmp` support reads and writes; `/rom` is read-only. This is not
+SD-card access. See the app README and [SDK FTP guide](sdk/docs/ftp.md).

@@ -185,3 +185,11 @@ NFC, UDP and haptic requests deliberately pause rendering at a cycle boundary
 while the host handles them. Ordinary navigation has no recurring host-poll
 pause. The mailbox is suitable for occasional service requests, not low-latency
 multiplayer traffic. Consult the capability matrix for unimplemented surfaces.
+
+## Background FTP service
+
+HBLauncher v0.2.0 adds console FTP transfers for title-owned files while GPU
+rendering continues. Declare `sdk.services: ["ftp"]` and use the `hbFtp*` helpers.
+See [the FTP guide](docs/ftp.md) for the complete manifest, status ABI, file
+permissions, lifecycle, client setup and verification commands. The standalone
+[ftpd-sb app](https://github.com/ravensclawx/ftpd-sb) is the complete example.
