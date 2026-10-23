@@ -3,13 +3,21 @@
 // Include state.glsl first. Compute owns writes; define STATE_ACCESS readonly in fragment.
 const uint HB_A=1u,HB_B=2u,HB_X=4u,HB_Y=8u,HB_L=64u,HB_R=128u,HB_PLUS=1024u,HB_MINUS=2048u;
 const uint HB_LEFT=4096u,HB_UP=8192u,HB_RIGHT=16384u,HB_DOWN=32768u;
-const uint HB_PAD=1u,HB_MOTION=2u,HB_KEYBOARD=4u,HB_MOUSE=8u,HB_NETWORK=16u,HB_JOY_MOUSE=32u;
+const uint HB_PAD=1u,HB_MOTION=2u,HB_KEYBOARD=4u,HB_MOUSE=8u,HB_NETWORK=16u,HB_JOY_MOUSE=32u,HB_PAD_SOURCES=64u;
 const uint HB_EXT=(0x7f0000u-1024u)/4u;
 uint hbWord(uint offset){return c.atlas[HB_EXT+offset/4u];}
 float hbFloat(uint offset){return uintBitsToFloat(hbWord(offset));}
 bool hbAvailable(){return hbWord(0u)==0x48425344u&&hbWord(4u)==1u;}
 bool hbHas(uint flags){return hbAvailable()&&(hbWord(12u)&flags)==flags;}
-uint hbButtons(){return c.raw[0].z;}
+// A detached Joy-Con can report outside the selected handheld state.
+uint hbButtons(){
+ uint buttons=c.raw[0].z;
+ if(hbHas(HB_PAD_SOURCES))for(uint i=0u;i<5u;i++){
+  uint offset=640u+i*64u;
+  if((hbWord(offset+32u)&1u)!=0u)buttons|=hbWord(offset+8u);
+ }
+ return buttons;
+}
 uint hbPressed(){return hbButtons()&~c.state.y;}
 bool hbConnected(){return (c.raw[2].x&1u)!=0u;}
 vec2 hbStick(bool right){ivec2 raw=right?ivec2(c.raw[1].zw):ivec2(c.raw[1].xy);vec2 s=clamp(vec2(raw)/32767.0,-1.0,1.0);float n=length(s);return n<=.15?vec2(0):s/n*min(1.0,(n-.15)/.85);}

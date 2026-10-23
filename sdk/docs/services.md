@@ -21,6 +21,11 @@ has joined; it refreshes ownership after a package transition.
   keyboard, mouse, network address and IR status.
 - `controllers`: the latest discovered IDs/styles. Only the selected controller
   has state and motion sampled by this API.
+- Button helpers combine connected handheld and player-one controller styles, so
+  one detached Joy-Con can click while the other remains attached. These extra
+  states occupy snapshot bytes 640–959 (five 64-byte slots) under flag 64;
+  each frame samples them on the console without host polling pauses. Stick and
+  motion helpers still use the selected primary controller.
 - `frameCalls(mapped)`: qualified `{function,args}` descriptors for primary pad,
   motion, keyboard and mouse reads, plus a Jcms transfer-buffer snapshot. The launcher includes these before graphics
   submission in each native frame. Call only in a qualified worker and do not

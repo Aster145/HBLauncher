@@ -25,6 +25,21 @@ async function main(){
  let click=await step(shoulder,64);assert.equal(click.readUInt32LE(120),0,'L ignored when only right mouse tracks');
  click=await step(shoulder,128);assert.equal(click.readUInt32LE(120),1,'R clicks the speaker in right mouse mode');assert.equal(click.readUInt32LE(1004),1,'tracking shows cursor');
  shoulder.writeUInt32LE(1,record+32);click=await step(shoulder,128);assert.equal(click.readUInt32LE(120),0,'R ignored outside optical tracking');assert.equal(click.readUInt32LE(1004),0,'cursor hides outside mouse mode');
+ // One side can stay handheld while the detached side reports through player one.
+ for(const [side,button,source] of [[0,64,2],[1,128,2],[0,64,3],[1,128,4]]){
+  const mixed=Buffer.alloc(8*1024*1024);
+  mixed.writeUInt32LE(L.MAGIC,L.OFFSET);mixed.writeUInt32LE(L.VERSION,L.OFFSET+4);
+  mixed.writeUInt32LE(L.FLAGS.joyMouse|L.FLAGS.padSources,L.OFFSET+12);
+  mixed.writeUInt32LE(1,784);mixed.writeFloatLE(1490,816);mixed.writeFloatLE(179,820);
+  const base=L.OFFSET+0x4000+side*712,slot=base+32+40;
+  mixed.writeUInt32LE(1,base+16);mixed.writeUInt32LE(1,base+24);
+  mixed.writeBigUInt64LE(2n,slot);mixed.writeBigUInt64LE(1n,slot+16);mixed.writeUInt32LE(3,slot+32);
+  const pad=L.OFFSET+L.FIELD.padSources+source*64;
+  mixed.writeUInt32LE(button,pad+8);mixed.writeUInt32LE(1,pad+32);
+  let result=await step(mixed,0);assert.equal(result.readUInt32LE(120),1,'detached side clicks while primary handheld reports no button');
+  result=await step(result,0);assert.equal(result.readUInt32LE(120),1,'holding shoulder does not repeat click');
+  mixed.writeUInt32LE(0,pad+32);result=await step(mixed,0);assert.equal(result.readUInt32LE(120),0,'disconnected source cannot click');
+ }
  state=await step(state,512);assert.equal(state.readFloatLE(964),1,'ZR on the hovered row launches selection');
  console.log('SDK launcher passed: black startup and 15-frame fade, optical movement, deduplication, torn-record rejection, no System menu, mode-specific shoulder clicks, cursor hiding, ZR launch.');
 }

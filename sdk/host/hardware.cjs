@@ -1,12 +1,15 @@
 const hid=require('../native/hid-functions.json'),services=require('../native/service-functions.json');
 const {MAGIC,VERSION,FIELD:F,FLAGS,word}=require('./layout.cjs');
 const STYLES=[[1,'FullKey'],[2,'Handheld'],[4,'JoyDual'],[8,'JoyLeft'],[16,'JoyRight']];
+// Sample both handheld and player-one styles every frame, including mixed attachment.
+const PAD_SOURCES=[[32,'Handheld'],[0,'FullKey'],[0,'JoyDual'],[0,'JoyLeft'],[0,'JoyRight']];
 const IDS=[32,0,1,2,3,4,5,6,7,16];
 async function create(rpc){
  const serviceNames=['netStatus','netAddress','socketInitialized','irHandle','irStatus'];
  const api=await require('../native/client.cjs').create(rpc,{...hid,...Object.fromEntries(serviceNames.map(k=>[k,services[k]]))});
  let joyMouse,joyMouseError;
  try{joyMouse=await require('./joy-mouse.cjs').create(rpc);}catch(error){joyMouseError=error.message;}
+ for(let i=0;i<PAD_SOURCES.length;i++)await api.write(0x1000+i*4,word(PAD_SOURCES[i][0]));
  let sequence=0,selected=null,motion=[],vibration=[],lastDiscovery=0,closed=false;
  async function stopMotion(){for(const handle of motion)await api.result('motionStop',[handle]);motion=[];}
  async function discover(){
@@ -29,6 +32,7 @@ async function create(rpc){
   if(closed)throw Error('Hardware context closed');
   const ext=mapped+require('./layout.cjs').OFFSET,calls=[];
   if(selected)calls.push({function:api.functions['pad'+selected.kind],args:[mapped,api.base]});
+  for(let i=0;i<PAD_SOURCES.length;i++)calls.push({function:api.functions['pad'+PAD_SOURCES[i][1]],args:[ext+F.padSources+i*64,api.base+0x1000+i*4]});
   for(let i=0;i<motion.length;i++)calls.push({function:api.functions.motionRead,args:[api.base+0x400+i*4,ext+F.motion+i*96,1,motion[i]]});
   calls.push({function:api.functions.keyboard,args:[api.base+0xc00,ext+F.keyboard,1]});
   calls.push({function:api.functions.mouse,args:[ext+F.mouse]});
@@ -37,11 +41,15 @@ async function create(rpc){
  },async poll(){
   if(closed)throw Error('Hardware context closed');
   if(!lastDiscovery||Date.now()-lastDiscovery>5000)hardware.controllers=await discover();
-  const out=Buffer.alloc(1024);out.writeUInt32LE(MAGIC,F.magic);out.writeUInt32LE(VERSION,F.version);out.writeUInt32LE(++sequence>>>0,F.sequence);let flags=joyMouse?32:0;
+  const out=Buffer.alloc(1024);out.writeUInt32LE(MAGIC,F.magic);out.writeUInt32LE(VERSION,F.version);out.writeUInt32LE(++sequence>>>0,F.sequence);let flags=FLAGS.padSources|(joyMouse?FLAGS.joyMouse:0);
   out.writeUInt32LE(joyMouse?1:0,512);
   if(selected){
    out.writeUInt32LE(selected.id,F.padId);out.writeUInt32LE(selected.style,F.style);await api.write(0,word(selected.id));
    await api.call('pad'+selected.kind,[api.base+0x100,api.base]);(await api.read(0x100,64)).copy(out,F.pad);flags|=FLAGS.pad;
+  }
+  for(let i=0;i<PAD_SOURCES.length;i++){
+   await api.call('pad'+PAD_SOURCES[i][1],[api.base+0x1100,api.base+0x1000+i*4]);
+   (await api.read(0x1100,64)).copy(out,F.padSources+i*64);
   }
   let validMotion=0;
   for(let i=0;i<motion.length;i++){
