@@ -21,7 +21,7 @@ async function main(directory,attempt=''){
  const save=()=>fs.writeFile(file,JSON.stringify(report,null,2)),tracked=journal(report,save),fn=report.functions;
  const atlas=await fs.readFile(path.join(__dirname,'shaders/launcher-text.bin'));check(atlas.length===1024*2048,'Unexpected text atlas');const storageBytes=8*1024*1024;
  const catalogBytes=await catalogTools.raster(catalog,directory,stem+'-catalog');
- const initialState=()=>{const state=Buffer.alloc(1024);state.writeUInt32LE(report.titleCount,112);state.writeUInt32LE(report.titleCount,1020);return state;};
+ const initialState=()=>{const state=Buffer.alloc(1024);state.writeUInt32LE(report.titleCount,112);state.writeUInt32LE(report.titleCount,1020);state.writeFloatLE(1,960);return state;};
  const worker=await create(rpc,directory);
  async function resolve(name){if(fn[name])return fn[name];const s=module.symbols.find(s=>s.name===name&&s.section&&s.type===2);check(s,'Missing '+name);const a=module.base+s.offset,b=await rpc.read(a,32);await rpc.request({command:'verify-function',address:a,hex:b.toString('hex')});return fn[name]=a;}
  async function call(name,...args){const a=await resolve(name);return tracked(name,args,()=>args.length>4?worker.call(a,args):rpc.callAddress(a,args).then(x=>x.result));}
@@ -84,7 +84,8 @@ async function main(directory,attempt=''){
   for(let i=0;i<count;i++){const image=await ptr(0x1000+i*8);images.push(image);await put(0x200,struct(80,15,{32:1,36:37,56:1,64:1,72:1},{24:image}));await ok('vkCreateImageView',device,p+0x200,0,p);views.push(await ptr(0));await ok('vkCreateSemaphore',device,p+0x100,0,p);semaphores.push(await ptr(0));}
   await put(0x100,struct(24,39,{20:previous.queueFamily}));await ok('vkCreateCommandPool',device,p+0x100,0,p);const pool=await ptr(0);
   report.resources={device:String(device),queue:String(queue),swapchain:String(swapchain),images:images.map(String),views:views.map(String),semaphores:semaphores.map(String),acquired:String(acquired),pool:String(pool)};await save();
-  const synthetic=initialState();synthetic.writeFloatLE(8,64);synthetic.writeUInt32LE(1,32);await rpc.write(mapped,synthetic);
+  // Compensate for the qualification dispatch so its presented frame stays black.
+  const synthetic=initialState();synthetic.writeFloatLE(1+1/15,960);synthetic.writeFloatLE(8,64);synthetic.writeUInt32LE(1,32);await rpc.write(mapped,synthetic);
   for(let frame=0;frame<1;frame++){
    const commands=[];
    for(let i=0;i<count;i++){

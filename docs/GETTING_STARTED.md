@@ -112,7 +112,9 @@ with a keyboard instead, but preserve punctuation, line breaks and character cas
    then types the connection command supplied by this host session. The expected
    `Out of memory` response to `REMOVE` is part of the bootstrap sequence.
 5. Wait for the host to finish checks, upload graphics/audio and show HBLauncher.
-   A successful startup reports a continuous native frame loop.
+   A successful startup reports a continuous native frame loop. The display stays
+   black during graphics preparation, then HBLauncher fades in over 15 frames
+   (about a quarter of a second at 60 Hz).
 
 **Never repeat `REMOVE` in the same SmileBASIC process.** After a failed attempt,
 close/restart SmileBASIC before retrying. Reuse the saved NS2 program, not an old

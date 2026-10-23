@@ -5,6 +5,15 @@ async function main(){
  const root=path.resolve(__dirname,'../..'),dir=await fs.mkdtemp(path.join(os.tmpdir(),'hb-sdk-launcher-'));
  async function step(state,buttons){const input=Buffer.alloc(64);input.writeUInt32LE(buttons,8);input.writeUInt32LE(1,32);await fs.writeFile(path.join(dir,'state'),state);await fs.writeFile(path.join(dir,'input'),input);execFileSync(path.join(root,'homebrew-launcher/game-compute-check'),[path.join(dir,'state'),path.join(dir,'out'),path.join(root,'homebrew-launcher/shaders/launcher.comp.spv'),path.join(dir,'input'),'1'],{env:{...process.env,HB_FULL_OUTPUT:'1'},stdio:'pipe'});return fs.readFile(path.join(dir,'out'));}
  let state=Buffer.alloc(8*1024*1024);state.writeUInt32LE(L.MAGIC,L.OFFSET);state.writeUInt32LE(L.VERSION,L.OFFSET+4);state.writeUInt32LE(32,L.OFFSET+12);state.writeUInt32LE(1,112);state.writeUInt32LE(1,1020);
+ // Startup qualification remains black; continuous frames reveal the menu once.
+ let startup=Buffer.from(state);startup.writeFloatLE(1+1/15,960);
+ startup=await step(startup,0);assert.ok(Math.abs(startup.readFloatLE(960)-1)<1e-6,'qualification frame stays black');
+ startup.writeFloatLE(1,960);
+ for(let frame=0;frame<15;frame++){
+  const before=startup.readFloatLE(960);startup=await step(startup,0);
+  assert.ok(startup.readFloatLE(960)<before,'startup fade advances every frame');
+ }
+ assert.ok(startup.readFloatLE(960)<1e-6,'menu fully visible after 15 frames');
  const ring=L.OFFSET+0x4000+712,record=ring+32+40;state.writeUInt32LE(1,ring+16);state.writeUInt32LE(1,ring+24);state.writeBigUInt64LE(2n,record);state.writeBigUInt64LE(1n,record+16);state.writeInt32LE(20,record+24);state.writeInt32LE(-10,record+28);state.writeUInt32LE(3,record+32);
  state=await step(state,0);assert.equal(state.readFloatLE(816),990,'optical X delta');assert.equal(state.readFloatLE(820),525,'optical Y delta');
  state=await step(state,0);assert.equal(state.readFloatLE(816),990,'sample applied once');
@@ -17,6 +26,6 @@ async function main(){
  click=await step(shoulder,128);assert.equal(click.readUInt32LE(120),1,'R clicks the speaker in right mouse mode');assert.equal(click.readUInt32LE(1004),1,'tracking shows cursor');
  shoulder.writeUInt32LE(1,record+32);click=await step(shoulder,128);assert.equal(click.readUInt32LE(120),0,'R ignored outside optical tracking');assert.equal(click.readUInt32LE(1004),0,'cursor hides outside mouse mode');
  state=await step(state,512);assert.equal(state.readFloatLE(964),1,'ZR on the hovered row launches selection');
- console.log('SDK launcher passed: optical movement, deduplication, torn-record rejection, no System menu, mode-specific shoulder clicks, cursor hiding, ZR launch.');
+ console.log('SDK launcher passed: black startup and 15-frame fade, optical movement, deduplication, torn-record rejection, no System menu, mode-specific shoulder clicks, cursor hiding, ZR launch.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

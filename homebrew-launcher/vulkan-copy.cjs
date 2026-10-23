@@ -155,7 +155,8 @@ async function main(directory,mode='copy',attempt){
     await call('vkCmdPipelineBarrier2',command,p+0x4300);
    }
    await transition(0,2,0,0,0x400,0x100);
-   const colors=[[1,0,0,1],[0,1,0,1],[0,0,1,1],[1,1,1,1]];
+   // Visible startup stays black; offscreen render diagnostics retain the color pattern.
+   const colors=present?Array(4).fill([0,0,0,1]):[[1,0,0,1],[0,1,0,1],[0,0,1,1],[1,1,1,1]];
    for(let i=0;i<4;i++){
     if(i)await transition(2,2,0x400,0x100,0x400,0x100);
     const attachment=struct(72,1000044001,{24:2,44:1},{16:imageView});
@@ -181,7 +182,7 @@ async function main(directory,mode='copy',attempt){
   submitted=true;await ok('vkQueueSubmit',queue,1,p+0x3200,0);await ok('vkQueueWaitIdle',queue);finished=true;
   const result=await rpc.read(mapped[render?0:1],byteCount);
   if(render){
-   const colors=[[255,0,0,255],[0,255,0,255],[0,0,255,255],[255,255,255,255]];let mismatches=0;
+   const colors=present?Array(4).fill([0,0,0,255]):[[255,0,0,255],[0,255,0,255],[0,0,255,255],[255,255,255,255]];let mismatches=0;
    for(let y=0;y<1080;y++)for(let x=0;x<1920;x++){
     const color=colors[(y>=540?2:0)+(x>=960?1:0)],at=(y*1920+x)*4;
     if(color.some((v,c)=>result[at+c]!==v))mismatches++;

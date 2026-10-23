@@ -92,7 +92,7 @@ async function main(directory,attempt=''){
   }
   report.passed=true;console.log('GPU checks passed: '+report.cases.length+' launcher cases. Apps use independent compute pipelines.');
  }finally{
-  const initial=Buffer.alloc(1024);initial.writeUInt32LE(prep.titleCount||0,112);initial.writeUInt32LE(prep.titleCount||0,1020);await rpc.write(prep.controls.mapped,initial);await put(0,saved);report.scratchRestored=(await rpc.read(p,saved.length)).equals(saved);report.completed=new Date().toISOString();await save();
+  const initial=Buffer.alloc(1024);initial.writeUInt32LE(prep.titleCount||0,112);initial.writeUInt32LE(prep.titleCount||0,1020);initial.writeFloatLE(1,960);await rpc.write(prep.controls.mapped,initial);await put(0,saved);report.scratchRestored=(await rpc.read(p,saved.length)).equals(saved);report.completed=new Date().toISOString();await save();
  }
 }
 if(require.main===module)main(process.argv[2],process.argv[3]).catch(e=>{console.error(e);process.exitCode=1;});
