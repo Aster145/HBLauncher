@@ -191,8 +191,16 @@ to learn from or modify.
 
 ### Install, refresh, and iterate
 
-Apps live in immediate subdirectories of `apps/`. Copy an app folder there and
-tap Refresh in the launcher. Hidden directories are ignored. To use another
+Apps live on the **host PC**, in immediate subdirectories of `apps/`.
+Download and extract a prebuilt app package, then copy its folder so the manifest
+is at `apps/my-app/app.json`. Keep all packaged assets beside it as supplied;
+do not leave the package zipped or nest it inside another download folder.
+Tap **Refresh** in the launcher to make it appear. Prebuilt apps need no compiling
+and no files copied onto the Pico or console SD card.
+
+To **update** an app, return to the launcher, replace its folder with the new
+package, then Refresh and relaunch. To **remove** an app, return to the launcher,
+delete or move its folder out of `apps/`, then Refresh. Hidden directories are ignored. To use another
 library, launch with an absolute path:
 
 ```sh

@@ -1,11 +1,11 @@
-# Local release preparation
+# Release preparation
 
 Maintainer and release commit identity: **RavensClawX**.
 
 The `release` branch is a clean source snapshot with required runtime assets.
-Older local development history is not part of that branch. Publish this branch
-or the exported archive when the maintainer's hosting account is ready; do not
-push every local ref or upload a working-directory ZIP.
+Older local development history is not part of that branch. The public repository
+is https://github.com/ravensclawx/HBLauncher, with `release` published as `main`.
+Do not push every local ref or upload a working-directory ZIP.
 
 Checks:
 
@@ -36,9 +36,8 @@ The archive excludes ignored tools, session captures, pairing keys, Wi-Fi
 settings and local test executables. It includes compiled GPU shaders, icons,
 font atlases, source, the Pico HID dependency and its notice, and documentation.
 Users supply their own supported console software and install host dependencies.
-The root README retains upstream and third-party attribution, including audio.
+The root README retains upstream and third-party attribution, for the included dependencies.
 No blanket license has been assigned to third-party material.
 
-When publishing later, set a GitHub remote owned by the maintainer and push only
-`release:main`. Never use `--mirror` or `--all` for this prepared source release.
-Hosting/account setup and publishing are intentionally deferred.
+Publish updates through the `github` remote using `git push github release:main`.
+Never use `--mirror` or `--all` for this prepared source release.
