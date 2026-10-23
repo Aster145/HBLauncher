@@ -2,6 +2,13 @@
 
 Maintained by **RavensClawX**.
 
+> **USE AT YOUR OWN RISK.** This software is provided as-is, without warranties.
+> To the fullest extent permitted by law, RavensClawX and contributors are not
+> responsible for damage to your Nintendo Switch 2, PC, Pico, or other hardware;
+> data loss; corrupted saves; or other consequences of using this software.
+> Back up important data before making changes. Apps using filesystem features
+> can modify or delete real SmileBASIC files.
+
 **First time? Follow [Getting Started](docs/GETTING_STARTED.md)** for the complete
 Pico setup, SmileBASIC entry and first launch. Prebuilt GPU assets are included;
 you do not need to compile the launcher to run it.
