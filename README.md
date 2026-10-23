@@ -3,7 +3,7 @@
 Maintained by **RavensClawX**.
 
 > **USE AT YOUR OWN RISK.** This software is provided as-is, without warranties.
-> To the fullest extent permitted by law, RavensClawX and contributors are not
+> RavensClawX and contributors are not
 > responsible for damage to your Nintendo Switch 2, PC, Pico, or other hardware;
 > data loss; corrupted saves; or other consequences of using this software.
 > Back up important data before making changes. Apps using filesystem features
