@@ -1,0 +1,81 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_control_flow_attributes : require
+layout(local_size_x=1) in;
+#include "abi.glsl"
+#include "hb.glsl"
+#include "nes.glsl"
+#include "ppu.glsl"
+#include "cpu.glsl"
+
+bool nesConnected(){
+ if(hbConnected())return true;
+ if(hbHas(HB_PAD_SOURCES))for(uint i=0u;i<5u;i++)if((hbWord(640u+i*64u+32u)&1u)!=0u)return true;
+ return false;
+}
+vec2 nesStick(){
+ vec2 s=hbStick(false);
+ if(hbHas(HB_PAD_SOURCES))for(uint i=0u;i<5u;i++){
+  uint o=640u+i*64u;if((hbWord(o+32u)&1u)==0u)continue;
+  vec2 t=clamp(vec2(int(hbWord(o+16u)),int(hbWord(o+20u)))/32767.0,-1.0,1.0);
+  if(dot(t,t)>dot(s,s))s=t;
+ }
+ return s;
+}
+void nesReset(){
+ uint prg=NR(R_PRGSIZE),mirror=NR(R_MIRROR),chrram=NR(R_CHRRAM);
+ for(uint i=N_RAM;i<N_LINE+240u*N_LINE_STRIDE;i++)c.atlas[i]=0u;
+ NR(R_PRGSIZE)=prg;NR(R_MIRROR)=mirror;NR(R_CHRRAM)=chrram;
+ if(chrram!=0u)for(uint i=0u;i<8192u;i++)c.atlas[N_CHR+i]=0u;
+ ppuReset();cpuReset();NR(R_MAGIC)=0x4e455331u;
+}
+uint nesController(uint b){
+ vec2 s=nesStick();uint n=0u;
+ if((b&HB_A)!=0u)n|=1u;if((b&(HB_B|HB_Y))!=0u)n|=2u;
+ if((b&HB_L)!=0u)n|=4u;if((b&HB_PLUS)!=0u)n|=8u;
+ if((b&HB_UP)!=0u||s.y>.5)n|=16u;if((b&HB_DOWN)!=0u||s.y<-.5)n|=32u;
+ if((b&HB_LEFT)!=0u||s.x<-.5)n|=64u;if((b&HB_RIGHT)!=0u||s.x>.5)n|=128u;
+ if((n&48u)==48u)n&=~48u;if((n&192u)==192u)n&=~192u;
+ return n;
+}
+void main(){
+ if(any(notEqual(gl_GlobalInvocationID,uvec3(0u))))return;
+ uint buttons=hbButtons(),pressed=hbPressed();
+ c.state.z++;c.transition.x=0.0;
+ if((pressed&HB_MINUS)!=0u){hbExit();hbEndFrame();return;}
+ if(NR(R_MAGIC)!=0x4e455331u||(pressed&HB_R)!=0u)nesReset();
+ if((pressed&HB_X)!=0u)NR(R_PAUSED)^=1u;
+ if(!nesConnected())NR(R_PAUSED)=1u;
+ if(NR(R_PAUSED)!=0u||NR(R_FAULT)!=0u){hbEndFrame();return;}
+ NR(R_JOY)=nesController(buttons);
+ // NTSC scanline approximation: 341 PPU dots per line, 3 dots per CPU cycle.
+ // The 0..2 remainder carries across frames. CPU instruction overruns are
+ // independently carried by cpuRun, including OAM DMA stalls.
+ uint phase=NR(36u);NR(R_STATUS)&=31u;
+ for(int line=-1;line<261;line++){
+  phase+=341u;uint budget=phase/3u;phase%=3u;
+  if(line==241){NR(R_STATUS)|=128u;if((NR(R_CTRL)&128u)!=0u)NR(R_NMI)=1u;}
+  bool visibleLine=line>=0&&line<240;
+  int hit=-1;uint first=budget;
+  if(visibleLine){
+   ppuSnapshot(uint(line));
+   hit=(NR(R_STATUS)&64u)==0u?ppuSpriteZeroX(uint(line)):-1;
+   first=hit>=0?min(86u,(uint(hit)+3u)/3u):86u;
+  }else if(line==-1)first=94u;
+  // Keep just one interpreter call site. Driver inlining otherwise duplicates
+  // the entire CPU/PPU bus for every timing segment, slowing pipeline creation.
+  [[dont_unroll]] for(uint segment=0u;segment<3u;segment++){
+   uint duration=segment==0u?first:0u;
+   if(visibleLine&&segment==1u)duration=86u-first;
+   if(visibleLine&&segment==2u)duration=budget-86u;
+   if(line==-1&&segment==1u)duration=budget-94u;
+   cpuRun(duration);
+   if(visibleLine&&segment==0u&&hit>=0)NR(R_STATUS)|=64u;
+   if(visibleLine&&segment==1u)ppuEndLine();
+   // Vertical reload occurs late in pre-render, after possible scroll writes.
+   if(line==-1&&segment==0u&&(NR(R_MASK)&24u)!=0u)NR(R_V)=NR(R_T);
+  }
+  if(NR(R_FAULT)!=0u)break;
+ }
+ NR(36u)=phase;NR(R_FRAME)++;hbEndFrame();
+}

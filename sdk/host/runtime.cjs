@@ -1,26 +1,37 @@
 const L=require('./layout.cjs');
 function validateManifest(value){
  if(value===undefined)return {capabilities:[],endpoints:[]};
- if(!value||value.version!==1||!Array.isArray(value.capabilities)||value.capabilities.some(x=>!['vibration','nfc','udp'].includes(x)))throw Error('Invalid SDK manifest');
+ if(!value||value.version!==1||!Array.isArray(value.capabilities)||value.capabilities.some(x=>!['vibration','nfc','udp','files-read'].includes(x)))throw Error('Invalid SDK manifest');
  const services=value.services??[];if(!Array.isArray(services)||services.some(s=>s!=='ftp'))throw Error('Invalid SDK background service');
  if(value.ftpPort!==undefined&&(!Number.isInteger(value.ftpPort)||value.ftpPort<1024||value.ftpPort>65535))throw Error('Invalid FTP port');
  const endpoints=value.endpoints??[];if(!Array.isArray(endpoints)||endpoints.length>8)throw Error('SDK supports at most eight UDP endpoints');
  return {capabilities:[...new Set(value.capabilities)],endpoints:endpoints.map(require('./network.cjs').endpoint)};
 }
-async function create({rpc,mapped,directory,hardware:providedHardware}){
- const hardware=providedHardware??await require('./hardware.cjs').create(rpc);let nfc,network,lastSequence=0,owner=null;
+function browserResult(result){
+ // This view layout belongs only to file-browser. Validate all writes before
+ // touching GPU storage, including when a later write in the result is bad.
+ const P=require('../../apps/file-browser/protocol.json');
+ const ranges=[[P.metadata.offset,P.metadata.offset+P.metadata.bytes],[P.atlas.offset,P.atlas.offset+P.atlas.width*P.atlas.height]];
+ if(!result||!Buffer.isBuffer(result.payload)||result.payload.length>1024||!Array.isArray(result.writes)||result.writes.length>2)throw Error('Invalid file-browser result');
+ for(const write of result.writes){
+  if(!write||!Number.isSafeInteger(write.offset)||!Buffer.isBuffer(write.bytes)||!write.bytes.length||!ranges.some(([start,end])=>write.offset>=start&&write.offset+write.bytes.length<=end))throw Error('File-browser upload exceeds view bounds');
+ }
+ return result;
+}
+async function create({rpc,mapped,directory,hardware:providedHardware,browserFactory}){
+ const hardware=providedHardware??await require('./hardware.cjs').create(rpc);let nfc,network,browser,lastSequence=0,owner=null;
  const base=mapped+L.OFFSET;
  return {hardware,async atBoundary(app=null){
-  const identity=app?.fingerprint??'launcher';
-  if(owner!==identity){owner=identity;lastSequence=0;await rpc.write(base+L.FIELD.request,Buffer.alloc(6144));}
+  const identity=app?JSON.stringify([app.id,app.fingerprint]):'launcher';
+  if(owner!==identity){await browser?.reset?.();owner=identity;lastSequence=0;await rpc.write(base+L.FIELD.request,Buffer.alloc(6144));}
   await rpc.write(base,await hardware.poll());
   const request=await rpc.read(base+L.FIELD.request,1056),sequence=request.readUInt32LE();
   if(!sequence||sequence===lastSequence)return;lastSequence=sequence;
   const op=request.readUInt32LE(4),reply=Buffer.alloc(1056);reply.writeUInt32LE(sequence);
   const config=app?validateManifest(app.manifest.sdk):{capabilities:['vibration','nfc'],endpoints:[]};
-  const capability=({1:'vibration',2:'nfc',3:'udp',4:'vibration'})[op];let status=L.STATUS.ok,payload=Buffer.alloc(0);
+  const capability=({1:'vibration',2:'nfc',3:'udp',4:'vibration',5:'files-read'})[op];let status=L.STATUS.ok,payload=Buffer.alloc(0);
   try{
-   if(!capability||!config.capabilities.includes(capability)){status=L.STATUS.unsupported;}
+   if(!capability||!config.capabilities.includes(capability)||(op===L.OP.filesRead&&app?.id!=='file-browser')){status=L.STATUS.unsupported;}
    else if(op===L.OP.vibrate){
     const result=await hardware.pulse({side:request.readUInt32LE(8),milliseconds:request.readUInt32LE(12),amplitude:request.readUInt32LE(16)/1000});payload=result.actual;
    }else if(op===L.OP.haptics){
@@ -34,9 +45,14 @@ async function create({rpc,mapped,directory,hardware:providedHardware}){
    }else if(op===L.OP.udp){
     const index=request.readUInt32LE(8),length=request.readUInt32LE(12);if(index>=config.endpoints.length||length<1||length>1024){status=L.STATUS.invalid;}
     else{network??=await require('./network.cjs').create(rpc,directory);payload=await network.exchange(config.endpoints[index],request.subarray(32,32+length));}
+   }else if(op===L.OP.filesRead){
+    browser??=await (browserFactory??require('./file-browser.cjs').create)({rpc,directory});
+    const result=browserResult(await browser.handle(request));
+    for(const write of result.writes)await rpc.write(mapped+write.offset,write.bytes);
+    payload=result.payload;
    }
   }catch(error){status=error.code==='ETIMEDOUT'?L.STATUS.timeout:L.STATUS.native;payload=Buffer.from(error.message).subarray(0,1024);}
   reply.writeUInt32LE(status,4);reply.writeUInt32LE(payload.length,8);payload.copy(reply,32);await rpc.write(base+L.FIELD.response,reply);
- },async close(){await hardware.close();}};
+ },async close(){try{await browser?.reset?.();}finally{await hardware.close();}}};
 }
 module.exports={create,validateManifest};

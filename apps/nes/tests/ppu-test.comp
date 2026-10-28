@@ -1,0 +1,214 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+layout(set=0,binding=0,std430) buffer TestState { uint prefix[256]; uint atlas[]; } c;
+#include "../shaders/nes.glsl"
+#include "../shaders/ppu.glsl"
+#include "../shaders/pixel.glsl"
+const uint TEST_RESULTS = 150000u;
+void expect(uint id, uint actual, uint wanted) {
+    c.atlas[TEST_RESULTS]++;
+    if (actual != wanted) {
+        c.atlas[TEST_RESULTS + 1u]++;
+        if (c.atlas[TEST_RESULTS + 2u] == 0u) {
+            c.atlas[TEST_RESULTS + 2u] = id;
+            c.atlas[TEST_RESULTS + 3u] = actual;
+            c.atlas[TEST_RESULTS + 4u] = wanted;
+        }
+    }
+}
+void clean() {
+    ppuReset();
+    NR(R_MIRROR) = 1u;
+    NR(R_CHRRAM) = 1u;
+    for (uint i = 0u; i < 8192u; ++i) c.atlas[N_CHR + i] = 0u;
+}
+void sprite(uint i, uint y, uint tile, uint attr, uint x) {
+    uint a = N_OAM + i * 4u;
+    c.atlas[a] = y; c.atlas[a + 1u] = tile;
+    c.atlas[a + 2u] = attr; c.atlas[a + 3u] = x;
+}
+void main() {
+    for (uint i = 0u; i < 6u; ++i) c.atlas[TEST_RESULTS + i] = 0u;
+    clean();
+    NR(R_MIRROR) = 0u;
+    ppuWrite(0x2000u, 0x12u); ppuWrite(0x2800u, 0x34u);
+    expect(1u, ppuRead(0x2400u), 0x12u);
+    expect(2u, ppuRead(0x2c00u), 0x34u);
+    expect(3u, ppuRead(0x3000u), 0x12u);
+    NR(R_MIRROR) = 1u;
+    ppuWrite(0x2000u, 0x56u); ppuWrite(0x2400u, 0x78u);
+    expect(4u, ppuRead(0x2800u), 0x56u);
+    expect(5u, ppuRead(0x2c00u), 0x78u);
+    NR(R_MIRROR) = 2u;
+    ppuWrite(0x2800u, 0x9au);
+    expect(6u, ppuRead(0x2800u), 0x9au);
+    expect(7u, ppuRead(0x2000u), 0x56u);
+    for (uint i = 0u; i < 4u; ++i) {
+        ppuWrite(0x3f10u + 4u * i, 0x20u + i);
+        expect(8u + i, ppuRead(0x3f00u + 4u * i), 0x20u + i);
+        expect(12u + i, ppuRead(0x3f30u + 4u * i), 0x20u + i);
+    }
+    ppuWrite(0x3f01u, 255u);
+    expect(16u, ppuRead(0x7f21u), 63u);
+    NR(R_CHRRAM) = 0u;
+    ppuWrite(7u, 0x89u); expect(17u, ppuRead(7u), 0u);
+    NR(R_CHRRAM) = 1u;
+    ppuWrite(7u, 0x89u); expect(18u, ppuRead(7u), 0x89u);
+
+    clean();
+    ppuWriteReg(0u, 3u);
+    ppuWriteReg(5u, 0x2du);
+    expect(19u, NR(R_FINE_X), 5u);
+    expect(20u, NR(R_T), 0x0c05u);
+    expect(21u, NR(R_W), 1u);
+    ppuWriteReg(5u, 0xaeu);
+    expect(22u, NR(R_T), 0x6ea5u);
+    expect(23u, NR(R_W), 0u);
+    ppuWriteReg(6u, 0xffu);
+    expect(24u, NR(R_T), 0x3fa5u);
+    ppuWriteReg(6u, 0x21u);
+    expect(25u, NR(R_V), 0x3f21u);
+    NR(R_STATUS) = 0xe0u; NR(R_W) = 1u; NR(R_OPENBUS) = 0x1bu;
+    expect(26u, ppuReadReg(2u), 0xfbu);
+    expect(27u, NR(R_STATUS), 0x60u);
+    expect(28u, NR(R_W), 0u);
+    NR(R_STATUS) = 0x80u;
+    ppuWriteReg(0u, 0x80u); expect(29u, NR(R_NMI), 1u);
+    NR(R_NMI) = 0u;
+    ppuWriteReg(0u, 0x80u); expect(30u, NR(R_NMI), 0u);
+    ppuWriteReg(0u, 0u); ppuWriteReg(0u, 0x80u);
+    expect(31u, NR(R_NMI), 1u);
+    ppuWriteReg(3u, 255u); ppuWriteReg(4u, 0xabu);
+    expect(32u, NR(R_OAMADDR), 0u);
+    expect(33u, c.atlas[N_OAM + 255u], 0xabu);
+    ppuWriteReg(3u, 2u); ppuWriteReg(4u, 255u); ppuWriteReg(3u, 2u);
+    expect(34u, ppuReadReg(4u), 0xe3u);
+    expect(35u, NR(R_OAMADDR), 2u);
+    NR(R_OPENBUS) = 0xabu; expect(36u, ppuReadReg(1u), 0xabu);
+
+    clean();
+    ppuWrite(0x2000u, 0x33u); ppuWrite(0x2001u, 0x44u);
+    NR(R_V) = 0x2000u;
+    expect(37u, ppuReadReg(7u), 0u);
+    expect(38u, ppuReadReg(7u), 0x33u);
+    expect(39u, NR(R_V), 0x2002u);
+    expect(40u, NR(R_READBUF), 0x44u);
+    ppuWrite(0x3f00u, 0x2bu); ppuWrite(0x2f00u, 0x66u);
+    NR(R_V) = 0x3f00u; NR(R_OPENBUS) = 0xc0u;
+    expect(41u, ppuReadReg(7u), 0xebu);
+    expect(42u, NR(R_READBUF), 0x66u);
+    NR(R_MASK) = 1u; NR(R_V) = 0x3f00u;
+    expect(43u, ppuReadReg(7u), 0xe0u);
+    NR(R_CTRL) = 4u; NR(R_V) = 0x2100u;
+    ppuWriteReg(7u, 0x5au);
+    expect(44u, NR(R_V), 0x2120u);
+    expect(45u, ppuRead(0x2100u), 0x5au);
+    NR(R_V) = 0x7fffu; NR(R_CTRL) = 0u; ppuDataIncrement();
+    expect(46u, NR(R_V), 0u);
+
+    clean();
+    NR(R_STATUS) = 0xffu; NR(R_T) = 0x1234u; NR(R_V) = 0x4567u;
+    ppuBeginFrame();
+    expect(47u, NR(R_STATUS), 0x1fu);
+    expect(48u, NR(R_V), 0x4567u);
+    NR(R_MASK) = 8u; ppuBeginFrame();
+    expect(49u, NR(R_V), 0x1234u);
+    NR(R_T) = 0x405u; NR(R_V) = 0x73bfu; ppuEndLine();
+    expect(50u, NR(R_V), 0x0c05u);
+    NR(R_V) = 0x73ffu; ppuEndLine();
+    expect(51u, NR(R_V), 0x0405u);
+    NR(R_V) = 0x2000u; ppuEndLine();
+    expect(52u, NR(R_V), 0x3405u);
+    expect(53u, ppuHorizontalOffset(31u, 1u), 0x400u);
+    expect(54u, ppuHorizontalOffset(0x41fu, 1u), 0u);
+    NR(R_MASK) = 0u; ppuEndLine();
+    expect(55u, NR(R_V), 0x3405u);
+
+    clean();
+    ppuWrite(0u, 0x80u); ppuWrite(0x3f01u, 0x21u);
+    NR(R_MASK) = 0x0au;
+    ppuSnapshot(0u);
+    expect(56u, nesPixel(0u, 0u), 0x21u);
+    expect(57u, nesPixel(1u, 0u), 0x0fu);
+    ppuWrite(0x3f01u, 0x11u);
+    expect(58u, nesPixel(0u, 0u), 0x21u);
+    ppuWrite(0u, 0xffu); ppuWrite(0x23c0u, 0xe4u);
+    ppuWrite(0x3f05u, 0x15u); ppuWrite(0x3f09u, 0x19u); ppuWrite(0x3f0du, 0x1du);
+    NR(R_V) = 2u; ppuSnapshot(0u);
+    expect(59u, nesPixel(0u, 0u), 0x15u);
+    NR(R_V) = 64u; ppuSnapshot(0u);
+    expect(60u, nesPixel(0u, 0u), 0x19u);
+    NR(R_V) = 66u; ppuSnapshot(0u);
+    expect(61u, nesPixel(0u, 0u), 0x1du);
+    ppuWrite(0u, 0u); ppuWrite(0x3f0cu, 0x2cu); ppuSnapshot(0u);
+    expect(62u, nesPixel(0u, 0u), 0x0fu);
+    ppuWrite(0x201fu, 0u); ppuWrite(0x2400u, 1u); ppuWrite(0x23c7u, 0u);
+    ppuWrite(0u, 1u); ppuWrite(24u, 0x80u); ppuWrite(0x3f02u, 0x22u);
+    NR(R_V) = 31u; NR(R_FINE_X) = 7u; ppuSnapshot(0u);
+    expect(63u, nesPixel(0u, 0u), 0x11u);
+    expect(64u, nesPixel(1u, 0u), 0x22u);
+    expect(65u, NR(R_V), 31u);
+
+    clean();
+    ppuWrite(0u, 0xffu); ppuWrite(16u, 0x80u);
+    ppuWrite(0x3f01u, 0x11u); ppuWrite(0x3f11u, 0x31u); ppuWrite(0x3f15u, 0x35u);
+    sprite(0u, 0u, 1u, 0u, 16u); NR(R_MASK) = 0x1eu;
+    ppuSnapshot(1u);
+    expect(66u, nesPixel(16u, 1u), 0x31u);
+    expect(67u, uint(ppuSpriteZeroX(1u)), 16u);
+    expect(68u, NR(R_STATUS) & 0x40u, 0u);
+    NR(R_STATUS) |= 0x40u;
+    expect(69u, uint(ppuSpriteZeroX(1u)), 0xffffffffu);
+    NR(R_STATUS) &= 0xbfu;
+    sprite(0u, 0u, 1u, 0x20u, 16u); sprite(1u, 0u, 1u, 1u, 16u);
+    ppuSnapshot(1u);
+    expect(70u, nesPixel(16u, 1u), 0x11u);
+    expect(71u, uint(ppuSpriteZeroX(1u)), 16u);
+    ppuWrite(0u, 0u); ppuSnapshot(1u);
+    expect(72u, nesPixel(16u, 1u), 0x31u);
+    expect(73u, uint(ppuSpriteZeroX(1u)), 0xffffffffu);
+    sprite(1u, 255u, 1u, 0u, 16u); sprite(0u, 0u, 1u, 0x40u, 16u); ppuSnapshot(1u);
+    expect(74u, nesPixel(16u, 1u), 0x0fu);
+    expect(75u, nesPixel(23u, 1u), 0x31u);
+    ppuWrite(0u, 0xffu); sprite(0u, 0u, 1u, 0u, 0u); NR(R_MASK) = 0x18u; ppuSnapshot(1u);
+    expect(76u, nesPixel(0u, 1u), 0x0fu);
+    expect(77u, uint(ppuSpriteZeroX(1u)), 0xffffffffu);
+    NR(R_MASK) = 0x1eu;
+    expect(78u, uint(ppuSpriteZeroX(1u)), 0u);
+    sprite(0u, 0u, 1u, 0u, 255u); ppuSnapshot(1u);
+    expect(79u, uint(ppuSpriteZeroX(1u)), 0xffffffffu);
+    expect(80u, nesPixel(255u, 1u), 0x31u);
+    NR(R_MASK) = 0x0au;
+    expect(81u, uint(ppuSpriteZeroX(1u)), 0xffffffffu);
+    NR(R_MASK) = 0x14u;
+    expect(82u, uint(ppuSpriteZeroX(1u)), 0xffffffffu);
+
+    NR(R_MASK) = 0x1eu; NR(R_CTRL) = 0x20u;
+    ppuWrite(0x1020u, 0x80u); ppuWrite(0x1037u, 1u); ppuWrite(0x1038u, 0x80u);
+    ppuWrite(0x3f12u, 0x32u);
+    sprite(0u, 0u, 3u, 0u, 16u); ppuSnapshot(1u);
+    expect(83u, nesPixel(16u, 1u), 0x31u);
+    ppuSnapshot(9u); expect(84u, nesPixel(16u, 9u), 0x32u);
+    sprite(0u, 0u, 3u, 0x80u, 16u); ppuSnapshot(1u);
+    expect(85u, nesPixel(23u, 1u), 0x31u);
+    expect(86u, nesPixel(16u, 1u), 0x11u);
+    NR(R_CTRL) = 0u; ppuWrite(23u, 1u);
+    sprite(0u, 0u, 1u, 0x80u, 16u); ppuSnapshot(1u);
+    expect(87u, nesPixel(23u, 1u), 0x31u);
+    NR(R_MASK) |= 1u; ppuSnapshot(1u);
+    expect(88u, nesPixel(23u, 1u), 0x30u);
+
+    for (uint i = 0u; i < 9u; ++i) sprite(i, 0u, 1u, 0u, i * 8u);
+    ppuSnapshot(1u);
+    expect(89u, c.atlas[N_LINE + N_LINE_STRIDE + 3u], 8u);
+    expect(90u, NR(R_STATUS) & 0x20u, 0x20u);
+    NR(R_STATUS) = 0u; NR(R_MASK) = 0u; ppuSnapshot(1u);
+    expect(91u, NR(R_STATUS) & 0x20u, 0u);
+    c.atlas[N_LINE + 240u * N_LINE_STRIDE] = 0x12345678u;
+    ppuSnapshot(240u);
+    expect(92u, c.atlas[N_LINE + 240u * N_LINE_STRIDE], 0x12345678u);
+    expect(93u, nesPixel(256u, 0u), 0x0fu);
+    expect(94u, nesPixel(0u, 240u), 0x0fu);
+    c.atlas[TEST_RESULTS + 5u] = 0x50505531u;
+}

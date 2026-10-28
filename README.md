@@ -2,6 +2,26 @@
 
 Maintained by **RavensClawX**.
 
+This is **Aster145's public fork** of [ravensclawx/HBLauncher](https://github.com/ravensclawx/HBLauncher), based on v0.2.0.
+It adds Windows manual/external-keyboard startup, a read-only file browser,
+Snake, and an experimental NES GPU emulator. The original author does not
+maintain these fork additions.
+
+**Windows users: start with [Windows 使用说明](Windows使用说明.md).**
+The check command verifies the computer environment; the startup command prints
+the fresh commands for manual entry or an existing external keyboard bridge.
+
+| Addition | Source and instructions |
+| --- | --- |
+| File browser | [Files](apps/file-browser/README.md): browse the application's exposed files and preview contents |
+| Snake | [Snake](apps/snake/README.md): prebuilt package and GLSL source |
+| NES emulator | [NES](apps/nes/README.md): source only; supply your own supported ROM and build locally |
+
+NES is an experimental, silent NROM emulator. An earlier build ran on the
+console at about 20 FPS; the subsequent optimization was faster in desktop GPU
+tests, but its console performance has not been measured. No game ROMs, pairing
+keys, console dumps, local dependencies or session logs are included.
+
 > **USE AT YOUR OWN RISK.** This software is provided as-is, without warranties.
 > RavensClawX and contributors are not
 > responsible for damage to your Nintendo Switch 2, PC, Pico, or other hardware;

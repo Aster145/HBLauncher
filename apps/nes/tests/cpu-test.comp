@@ -1,0 +1,52 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x=1) in;
+// The desktop harness reserves its first 64 bytes for frame input.
+layout(std430,binding=0) buffer TestState {uvec4 inputPad[4];uint atlas[];} c;
+#include "../shaders/nes.glsl"
+// CPU fixtures deliberately isolate the PPU interface. PPU integration is
+// verified separately by the app's own shader tests.
+uint ppuReadReg(uint reg){return c.atlas[89900u+reg]&255u;}
+void ppuWriteReg(uint reg,uint value){c.atlas[89900u+reg]=value;}
+#include "../shaders/cpu.glsl"
+const uint T_CASE=100000u,T_STRIDE=192u,T_RESULT=250000u,T_RESULT_STRIDE=64u;
+void testPut(uint a,uint v){
+ if(a<8192u)c.atlas[N_RAM+(a&2047u)]=v;
+ else if(a>=24576u&&a<32768u)c.atlas[N_SRAM+a-24576u]=v;
+ else if(a>=32768u)c.atlas[N_PRG+a-32768u]=v;
+}
+void main(){
+ uint count=c.atlas[90000u];
+ for(uint t=0u;t<count;t++){
+  for(uint i=0u;i<32768u;i++)c.atlas[N_PRG+i]=0u;
+  for(uint i=0u;i<2048u;i++)c.atlas[N_RAM+i]=0u;
+  for(uint i=0u;i<8192u;i++)c.atlas[N_SRAM+i]=0u;
+  for(uint i=0u;i<256u;i++)c.atlas[N_OAM+i]=0u;
+  for(uint i=0u;i<64u;i++)NR(i)=0u;
+  for(uint i=0u;i<8u;i++)c.atlas[89900u+i]=0u;
+  uint b=T_CASE+t*T_STRIDE;
+  NR(R_PRGSIZE)=c.atlas[b+4u];
+  for(uint i=0u;i<32u;i++)NR(i)=c.atlas[b+8u+i];
+  uint patches=c.atlas[b+5u];
+  for(uint i=0u;i<patches;i++)testPut(c.atlas[b+40u+2u*i],c.atlas[b+41u+2u*i]);
+  uint mode=c.atlas[b],returned=0u;
+  if(mode==0u){
+   for(uint i=0u;i<c.atlas[b+1u];i++){uint cycles=cpuStep();returned+=cycles;NR(R_CYCLES)+=cycles;}
+  }else if(mode==1u){cpuRun(c.atlas[b+1u]);returned=NR(R_CYCLES);}
+  else if(mode==2u){cpuReset();returned=NR(R_CYCLES);}
+  else if(mode==3u){
+   cpuWrite(16406u,1u);cpuWrite(16406u,0u);
+   for(uint i=0u;i<10u;i++)c.atlas[T_RESULT+t*T_RESULT_STRIDE+40u+i]=cpuRead(16406u);
+  }else if(mode==4u){
+   for(uint i=0u;i<256u;i++)c.atlas[N_RAM+512u+i]=i;
+   cpuRun(c.atlas[b+1u]);returned=NR(R_CYCLES);
+  }else if(mode==5u){cpuRun(c.atlas[b+1u]);cpuRun(c.atlas[b+2u]);returned=NR(R_CYCLES);}
+  uint outputBase=T_RESULT+t*T_RESULT_STRIDE;
+  for(uint i=0u;i<32u;i++)c.atlas[outputBase+i]=NR(i);
+  c.atlas[outputBase+32u]=returned;
+  for(uint i=0u;i<c.atlas[b+6u];i++){
+   uint address=c.atlas[b+168u+i];
+   c.atlas[outputBase+40u+i]=address>=65536u?c.atlas[N_OAM+(address&255u)]:cpuRead(address);
+  }
+ }
+}

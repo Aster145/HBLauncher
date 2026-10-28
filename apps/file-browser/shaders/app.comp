@@ -1,0 +1,120 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x=1,local_size_y=1,local_size_z=1) in;
+#include "abi.glsl"
+#include "hb.glsl"
+#include "browser.glsl"
+
+void fbSet(uint index,uint value){c.atlas[FB_CTRL+index]=value;}
+uint fbPathByte(uint index){return (hbWord(2080u+(index/4u)*4u)>>((index%4u)*8u))&255u;}
+uint fbPathLength(){return min(hbWord(2064u),740u);}
+bool fbPadConnected(){
+ if(hbConnected())return true;
+ if(hbHas(HB_PAD_SOURCES))for(uint i=0u;i<5u;i++)if((hbWord(640u+i*64u+32u)&1u)!=0u)return true;
+ return false;
+}
+vec2 fbStick(){
+ vec2 s=hbConnected()?hbStick(false):vec2(0);
+ if(hbHas(HB_PAD_SOURCES))for(uint i=0u;i<5u;i++){
+  uint o=640u+i*64u;if((hbWord(o+32u)&1u)==0u)continue;
+  vec2 t=clamp(vec2(int(hbWord(o+16u)),int(hbWord(o+20u)))/32767.0,-1.0,1.0);
+  if(dot(t,t)>dot(s,s))s=t;
+ }
+ return s;
+}
+// 1 up, 2 down. Opposing directions cancel. Horizontal input changes pages.
+uint fbNavigation(){
+ uint buttons=hbButtons();bool up=(buttons&HB_UP)!=0u,down=(buttons&HB_DOWN)!=0u;
+ if(up||down)return up==down?0u:(up?1u:2u);
+ vec2 stick=fbStick();if(abs(stick.y)<0.55||abs(stick.y)<=abs(stick.x))return 0u;
+ return stick.y>0.0?1u:2u;
+}
+void fbSubmit(uint mode,uint page,uint length){
+ if(hbRequest(5u,mode,page,length)){
+  fbSet(FC_MODE,mode);fbSet(FC_PAGE,page);fbSet(FC_PENDING,hbWord(2048u));
+  fbSet(FC_ERROR,0u);fbSet(FC_WAITING,0u);fbSet(FC_WAIT_FRAMES,0u);
+ }
+}
+void fbRoot(){hbRequestByte(0u,47u);fbSet(FC_SELECTION,0u);fbSubmit(1u,0u,1u);}
+bool fbValidMetadata(){
+ if(fbMeta(0u)!=FB_METADATA_MAGIC||fbMeta(4u)!=1u||fbMeta(8u)!=fbMode())return false;
+ if(fbMeta(28u)>12u||fbMeta(20u)==0u||fbMeta(16u)>=fbMeta(20u))return false;
+ uint length=fbMeta(64u);if(length<1u||length>740u||length!=fbPathLength())return false;
+ for(uint i=0u;i<length;i++)if(fbMetaByte(128u+i)!=fbPathByte(i))return false;
+ return true;
+}
+void fbAcknowledge(){
+ uint sequence=fbWord(FC_PENDING);
+ if(hbWord(4096u)!=sequence)return;
+ fbSet(FC_PENDING,0u);fbSet(FC_ACK,sequence);fbSet(FC_WAITING,0u);
+ if(hbResult()!=0u){fbSet(FC_ERROR,3u);fbSet(FC_HAVE_META,0u);return;}
+ if(!fbValidMetadata()){fbSet(FC_ERROR,2u);fbSet(FC_HAVE_META,0u);return;}
+ fbSet(FC_HAVE_META,1u);fbSet(FC_PAGE,fbMeta(16u));
+ fbSet(FC_SELECTION,fbRowCount()==0u?0u:min(fbSelection(),fbRowCount()-1u));
+}
+void fbParent(){
+ uint length=fbPathLength();if(length<=1u){fbRoot();return;}
+ uint cut=length;
+ while(cut>1u){cut--;if(fbPathByte(cut)==47u)break;}
+ uint page=0u,selection=0u;
+ if(fbMode()!=1u){page=fbWord(FC_RETURN_PAGE);selection=fbWord(FC_RETURN_SELECTION);}
+ fbSet(FC_SELECTION,selection);fbSubmit(1u,page,max(cut,1u));
+}
+void fbOpen(){
+ if(!fbReady()||fbMode()!=1u||fbRowCount()==0u)return;
+ uint o=1024u+fbSelection()*1024u,type=fbMeta(o),nameLength=fbMeta(o+4u);
+ uint pathLength=fbMeta(64u),prefix=pathLength==1u?0u:pathLength;
+ // Unaddressable rows are visible but never submitted as truncated paths.
+ if(fbMeta(o+16u)!=1u||nameLength==0u||nameLength>992u||prefix+1u+nameLength>740u){fbSet(FC_ERROR,4u);return;}
+ if(type!=1u&&type!=2u){fbSet(FC_ERROR,2u);fbSet(FC_HAVE_META,0u);return;}
+ for(uint i=0u;i<prefix;i++)hbRequestByte(i,fbMetaByte(128u+i));
+ hbRequestByte(prefix,47u);
+ for(uint i=0u;i<nameLength;i++)hbRequestByte(prefix+1u+i,fbMetaByte(o+32u+i));
+ if(type==2u){fbSet(FC_RETURN_PAGE,fbPage());fbSet(FC_RETURN_SELECTION,fbSelection());}
+ fbSet(FC_SELECTION,0u);fbSubmit(type==1u?1u:2u,0u,prefix+1u+nameLength);
+}
+void main(){
+ if(any(notEqual(gl_GlobalInvocationID,uvec3(0u))))return;
+ c.motion.x+=1.0/60.0;c.state.z++;
+ c.transition.x=max(0.0,c.transition.x-1.0/15.0);
+ if(fbWord(FC_MAGIC)!=FB_MAGIC){
+  for(uint i=0u;i<64u;i++)fbSet(i,0u);
+  fbSet(FC_MAGIC,FB_MAGIC);fbSet(FC_MODE,1u);fbSet(FC_WAITING,1u);
+ }
+ fbSet(FC_CONNECTED,fbPadConnected()?1u:0u);
+ uint pressed=hbPressed(),nav=fbNavigation();
+ uint previousNav=fbWord(FC_NAV),repeatFrames=fbWord(FC_REPEAT);
+ if(nav==0u||nav!=previousNav)repeatFrames=0u;else repeatFrames=min(repeatFrames+1u,1000000u);
+ bool move=nav!=0u&&(nav!=previousNav||(repeatFrames>=24u&&(repeatFrames-24u)%6u==0u));
+ fbSet(FC_NAV,nav);fbSet(FC_REPEAT,repeatFrames);
+ if((pressed&HB_MINUS)!=0u){hbExit();hbEndFrame();return;}
+ if(!hbAvailable()){fbSet(FC_WAITING,1u);hbEndFrame();return;}
+ if(fbWord(FC_STARTED)==0u){
+  if(!hbBusy()){fbRoot();fbSet(FC_STARTED,1u);}else fbSet(FC_WAITING,1u);
+  hbEndFrame();return;
+ }
+ if(fbBusy()){
+  fbSet(FC_WAIT_FRAMES,min(fbWord(FC_WAIT_FRAMES)+1u,1000000u));
+  if(fbWord(FC_WAIT_FRAMES)>=300u)fbSet(FC_WAITING,2u);
+  if(!hbBusy())fbAcknowledge();
+  // Inputs pressed during a response cannot operate on newly arrived rows.
+  hbEndFrame();return;
+ }
+ if(hbBusy()){hbEndFrame();return;}
+ if((pressed&HB_B)!=0u){fbParent();hbEndFrame();return;}
+ if((pressed&HB_X)!=0u){fbSubmit(fbMode(),fbWord(FC_PAGE),fbPathLength());hbEndFrame();return;}
+ if((pressed&HB_Y)!=0u&&fbMode()!=1u){fbSubmit(fbMode()==3u?2u:3u,fbWord(FC_PAGE),fbPathLength());hbEndFrame();return;}
+ if(!fbReady()){hbEndFrame();return;}
+ bool left=(pressed&(HB_L|HB_LEFT))!=0u,right=(pressed&(HB_R|HB_RIGHT))!=0u;
+ if(left!=right){
+  uint page=fbPage(),next=left?(page==0u?0u:page-1u):min(page+1u,fbTotalPages()-1u);
+  if(next!=page){fbSet(FC_SELECTION,0u);fbSubmit(fbMode(),next,fbPathLength());hbEndFrame();return;}
+ }
+ if(fbMode()==1u&&move&&fbRowCount()>0u){
+  uint selected=fbSelection();
+  selected=nav==1u?(selected==0u?0u:selected-1u):min(selected+1u,fbRowCount()-1u);
+  fbSet(FC_SELECTION,selected);
+ }
+ if((pressed&HB_A)!=0u)fbOpen();
+ hbEndFrame();
+}

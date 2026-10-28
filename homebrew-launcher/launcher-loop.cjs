@@ -34,8 +34,8 @@ async function main(directory,attempt='',instance=''){
  }
  const inputInspection=JSON.parse(await fs.readFile(path.join(directory,'input-inspection.json')));check(inputInspection.session===rpc.a.session,'Input inspection session differs');
  const input=inputInspection.imports['_ZN2nn3hid12GetNpadStateEPNS0_17NpadHandheldStateERKj'];
- const inputSlot=Number((await rpc.read(rpc.a.main+input.slot,8)).readBigUInt64LE());check(inputSlot===input.target,'Input function changed');
- await rpc.request({command:'verify-function',address:input.target,hex:input.bytes.slice(0,64)});verified.add(input.target);report.input={type:'handheld',id:32,target:input.target};
+ await require('./input-resolution.cjs').verifyHandheld(rpc,input);
+ verified.add(input.target);report.input={type:'handheld',id:32,target:input.target,resolution:input.resolution||'import'};
  const touch=inputInspection.imports['_ZN2nn3hid19GetTouchScreenStateILm16EEEvPNS0_16TouchScreenStateIXT_EEE'];
  check(Number((await rpc.read(rpc.a.main+touch.slot,8)).readBigUInt64LE())===touch.target,'Touch import changed');await rpc.request({command:'verify-function',address:touch.target,hex:touch.bytes.slice(0,64)});verified.add(touch.target);report.touch={target:touch.target,offset:128};
  const temp=rpc.a.scratch+0x10000,saved=await rpc.read(temp,8);let base;

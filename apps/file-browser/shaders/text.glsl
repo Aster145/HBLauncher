@@ -1,0 +1,15 @@
+const ivec4 TEXT_TITLE=ivec4(2,2,290,56);
+const ivec4 TEXT_READONLY=ivec4(2,68,50,24);
+const ivec4 TEXT_NAME=ivec4(2,102,44,21);
+const ivec4 TEXT_SIZE=ivec4(2,133,111,21);
+const ivec4 TEXT_LOADING=ivec4(2,164,144,31);
+const ivec4 TEXT_WAITING=ivec4(2,205,264,31);
+const ivec4 TEXT_HOST=ivec4(2,246,294,32);
+const ivec4 TEXT_ERROR=ivec4(2,288,136,34);
+const ivec4 TEXT_PROTOCOL=ivec4(2,332,370,29);
+const ivec4 TEXT_UNSUPPORTED=ivec4(2,371,589,30);
+const ivec4 TEXT_LONGPATH=ivec4(2,411,516,28);
+const ivec4 TEXT_RETRY=ivec4(2,449,330,26);
+const ivec4 TEXT_LIST_KEYS=ivec4(2,485,562,24);
+const ivec4 TEXT_FILE_KEYS=ivec4(2,519,565,25);
+const ivec4 TEXT_DISCONNECTED=ivec4(2,554,120,24);

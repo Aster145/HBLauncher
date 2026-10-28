@@ -4,8 +4,8 @@ const {tool}=require('./toolchain.cjs');const root=path.resolve(__dirname,'..');
 function check(name,ok,fix){console.log((ok?'OK   ':'NEED ')+name+(ok?'':' — '+fix));if(!ok)failed=true;}
 function runs(command,args){const r=spawnSync(command,args,{stdio:'ignore'});return !r.error&&r.status===0;}
 check('Node.js 22+',Number(process.versions.node.split('.')[0])>=22,'Install Node.js 22 or newer');
-check('Python 3 + Pillow',runs('python3',['-c','from PIL import Image,ImageDraw,ImageFont']),'Install python3 and python3-pil');
-check('DejaVu Sans font',fs.existsSync('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),'Install fonts-dejavu-core');
+check('Python 3 + Pillow',runs(tool('PYTHON','python3'),['-c','from PIL import Image,ImageDraw,ImageFont']),'Install Python + Pillow or set PYTHON');
+check('Menu font',fs.existsSync(process.env.HB_FONT||'/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),'Install fonts-dejavu-core or set HB_FONT');
 check('SPIR-V validator',runs(tool('SPIRV_VAL','spirv-val'),['--version']),'Install spirv-tools or set SPIRV_VAL');
 for(const file of ['homebrew-launcher/shaders/launcher.comp.spv','homebrew-launcher/shaders/launcher.frag.spv','apps/hello-world/app.json'])check(file,fs.existsSync(path.join(root,file)),'Use the complete release archive');
 if(!process.argv.includes('--host-only')){let key='';try{key=fs.readFileSync(path.join(root,'smilebasic/pico-keyboard/secret'),'utf8').trim();}catch{}check('Local Pico pairing key',/^[a-f0-9]{32}$/i.test(key),'Run smilebasic/pico-keyboard/install.sh with your CIRCUITPY drive and PC IPv4 address');}

@@ -1,0 +1,12 @@
+const ivec4 UI_TITLE=ivec4(2,2,300,29);
+const ivec4 UI_MOVE=ivec4(2,37,216,25);
+const ivec4 UI_JUMP=ivec4(2,68,89,22);
+const ivec4 UI_RUN=ivec4(2,96,125,24);
+const ivec4 UI_START=ivec4(2,126,96,22);
+const ivec4 UI_SELECT=ivec4(2,154,84,22);
+const ivec4 UI_PAUSE=ivec4(2,182,159,23);
+const ivec4 UI_RESET=ivec4(2,211,184,23);
+const ivec4 UI_EXIT=ivec4(2,240,242,23);
+const ivec4 UI_FOOTER=ivec4(2,269,422,24);
+const ivec4 UI_PAUSED=ivec4(2,299,216,33);
+const ivec4 UI_FAULT=ivec4(2,338,464,29);

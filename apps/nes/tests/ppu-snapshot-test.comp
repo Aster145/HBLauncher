@@ -1,0 +1,105 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+layout(set=0,binding=0,std430) buffer TestState { uint prefix[256]; uint atlas[]; } c;
+#include "../shaders/nes.glsl"
+#include "../shaders/ppu.glsl"
+const uint TEST_RESULTS = 150000u, REFERENCE = 150016u;
+
+// Frozen pre-optimization snapshot routine. Compare its complete 128-word
+// result and status/v side effects against the production routine, on GPU.
+void ppuSnapshotReference(uint y) {
+    if (y >= 240u) return;
+    uint base = N_LINE + y * N_LINE_STRIDE;
+    c.atlas[base] = NR(R_MASK);
+    c.atlas[base + 1u] = NR(R_FINE_X) & 7u;
+    c.atlas[base + 2u] = NR(R_CTRL);
+    for (uint i = 4u; i < 8u; ++i) c.atlas[base + i] = 0u;
+    for (uint i = 0u; i < 32u; ++i) c.atlas[base + 8u + i] = ppuRead(0x3f00u + i);
+    for (uint i = 0u; i < 33u; ++i)
+        c.atlas[base + 40u + i] = ppuBackgroundTile(ppuHorizontalOffset(NR(R_V), i));
+    for (uint i = 0u; i < 32u; ++i) c.atlas[base + 80u + i] = 0u;
+    uint found = 0u;
+    int height = ((NR(R_CTRL) & 0x20u) != 0u) ? 16 : 8;
+    for (uint i = 0u; i < 64u; ++i) {
+        uint oam = N_OAM + i * 4u;
+        int row = int(y) - int(c.atlas[oam] & 255u) - 1;
+        if (row < 0 || row >= height) continue;
+        if (found == 8u) {
+            if ((NR(R_MASK) & 0x18u) != 0u) NR(R_STATUS) |= 0x20u;
+            break;
+        }
+        uint attr = c.atlas[oam + 2u] & 255u;
+        uint pattern = ppuSpritePattern(c.atlas[oam + 1u] & 255u, attr, uint(row));
+        uint dst = base + 80u + found * 4u;
+        c.atlas[dst] = c.atlas[oam + 3u] & 255u;
+        c.atlas[dst + 1u] = pattern & 255u;
+        c.atlas[dst + 2u] = pattern >> 8u;
+        c.atlas[dst + 3u] = attr | ((i == 0u) ? 0x100u : 0u);
+        ++found;
+    }
+    c.atlas[base + 3u] = found;
+}
+
+uint noise(uint i) {
+    i ^= i >> 16u; i *= 0x7feb352du;
+    i ^= i >> 15u; i *= 0x846ca68bu;
+    return i ^ (i >> 16u);
+}
+void expect(uint id, uint actual, uint wanted) {
+    c.atlas[TEST_RESULTS]++;
+    if (actual != wanted) {
+        c.atlas[TEST_RESULTS + 1u]++;
+        if (c.atlas[TEST_RESULTS + 2u] == 0u) {
+            c.atlas[TEST_RESULTS + 2u] = id;
+            c.atlas[TEST_RESULTS + 3u] = actual;
+            c.atlas[TEST_RESULTS + 4u] = wanted;
+        }
+    }
+}
+void main() {
+    for (uint i = 0u; i < 6u; ++i) c.atlas[TEST_RESULTS + i] = 0u;
+    for (uint i = 0u; i < 8192u; ++i) c.atlas[N_CHR + i] = noise(i + 1u);
+    for (uint i = 0u; i < 4096u; ++i) c.atlas[N_NT + i] = noise(i + 9001u);
+    for (uint i = 0u; i < 32u; ++i) c.atlas[N_PAL + i] = noise(i + 14001u);
+    for (uint i = 0u; i < 64u; ++i) {
+        uint a = N_OAM + i * 4u;
+        c.atlas[a] = (i < 16u) ? 50u : i * 4u;
+        c.atlas[a + 1u] = noise(i + 15001u);
+        c.atlas[a + 2u] = noise(i + 16001u);
+        c.atlas[a + 3u] = noise(i + 17001u);
+    }
+    // 32 coarse X * 4 logical nametables * 8 fine Y * 3 mirror modes.
+    // Coarse Y, fine X, both pattern tables, sprite size/flips, masks and OAM
+    // occupancy vary across cases, with nonzero sentinels in reserved words.
+    for (uint mirror = 0u; mirror < 3u; ++mirror) {
+        NR(R_MIRROR) = mirror;
+        for (uint caseNo = 0u; caseNo < 1024u; ++caseNo) {
+            uint y = (caseNo * 17u) % 240u;
+            uint base = N_LINE + y * N_LINE_STRIDE;
+            uint cy = (caseNo * 13u + (caseNo >> 5u) * 7u) & 31u;
+            uint v = (((caseNo >> 7u) & 7u) << 12u) | (((caseNo >> 5u) & 3u) << 10u) | (cy << 5u) | (caseNo & 31u);
+            NR(R_V) = v;
+            NR(R_CTRL) = (caseNo & 7u) << 3u;
+            NR(R_MASK) = (caseNo * 29u) & 255u;
+            NR(R_FINE_X) = (caseNo >> 3u) & 7u;
+            NR(R_STATUS) = caseNo & 255u;
+            for (uint i = 0u; i < 128u; ++i)
+                c.atlas[base + i] = 0xa5000000u ^ (caseNo << 8u) ^ i;
+            ppuSnapshotReference(y);
+            uint wantedStatus = NR(R_STATUS);
+            for (uint i = 0u; i < 128u; ++i) {
+                c.atlas[REFERENCE + i] = c.atlas[base + i];
+                c.atlas[base + i] = 0xa5000000u ^ (caseNo << 8u) ^ i;
+            }
+            NR(R_STATUS) = caseNo & 255u;
+            ppuSnapshot(y);
+            uint id = (mirror * 1024u + caseNo) * 130u + 1u;
+            for (uint i = 0u; i < 128u; ++i)
+                expect(id + i, c.atlas[base + i], c.atlas[REFERENCE + i]);
+            expect(id + 128u, NR(R_STATUS), wantedStatus);
+            expect(id + 129u, NR(R_V), v);
+        }
+    }
+    c.atlas[TEST_RESULTS + 5u] = 0x50505531u;
+}

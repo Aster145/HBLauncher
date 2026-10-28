@@ -1,0 +1,140 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x=1,local_size_y=1,local_size_z=1) in;
+#include "abi.glsl"
+#include "hb.glsl"
+#include "game.glsl"
+
+void snakeSet(uint field,uint value){c.atlas[SNAKE_BASE+field]=value;}
+uint snakeRandom(){
+ uint x=snakeWord(SM_RNG);
+ x^=x<<13u;x^=x>>17u;x^=x<<5u;
+ snakeSet(SM_RNG,x);return x;
+}
+void snakePlaceFood(){
+ uint empty=SNAKE_CELLS-snakeLength();
+ if(empty==0u){snakeSet(SM_FOOD,SNAKE_CELLS);snakeSet(SM_STATUS,SNAKE_WON);return;}
+ // Choose an empty-cell rank, then scan once. This always terminates,
+ // even when only one empty cell remains.
+ uint rank=snakeRandom()%empty;
+ for(uint i=0u;i<SNAKE_CELLS;i++)if(c.atlas[SNAKE_OCC+i]==0u){
+  if(rank==0u){snakeSet(SM_FOOD,i);return;}rank--;
+ }
+}
+bool snakePadConnected(){
+ if(hbConnected())return true;
+ if(hbHas(HB_PAD_SOURCES))for(uint i=0u;i<5u;i++)
+  if((hbWord(640u+i*64u+32u)&1u)!=0u)return true;
+ return false;
+}
+vec2 snakeLeftStick(){
+ vec2 s=hbStick(false);
+ if(hbHas(HB_PAD_SOURCES))for(uint i=0u;i<5u;i++){
+  uint o=640u+i*64u;
+  if((hbWord(o+32u)&1u)==0u)continue;
+  vec2 t=clamp(vec2(int(hbWord(o+16u)),int(hbWord(o+20u)))/32767.0,-1.0,1.0);
+  if(dot(t,t)>dot(s,s))s=t;
+ }
+ return s;
+}
+uint snakeInputDirection(uint pressed){
+ const uint directions=HB_LEFT|HB_RIGHT|HB_UP|HB_DOWN;
+ uint buttons=hbButtons()&directions;
+ // A newly pressed direction wins over an older held direction.
+ if((pressed&directions)!=0u)buttons=pressed&directions;
+ int x=((buttons&HB_RIGHT)!=0u?1:0)-((buttons&HB_LEFT)!=0u?1:0);
+ int y=((buttons&HB_DOWN)!=0u?1:0)-((buttons&HB_UP)!=0u?1:0);
+ if(x!=0&&y==0)return x>0?0u:2u;
+ if(y!=0&&x==0)return y>0?1u:3u;
+ if(buttons!=0u)return 4u;
+ vec2 s=snakeLeftStick();
+ if(max(abs(s.x),abs(s.y))<0.5)return 4u;
+ if(abs(s.x)>abs(s.y))return s.x>0.0?0u:2u;
+ return s.y>0.0?3u:1u;
+}
+void snakeReset(uint status,uint best,uint seed){
+ for(uint i=0u;i<32u;i++)c.atlas[SNAKE_BASE+i]=0u;
+ for(uint i=0u;i<SNAKE_CELLS;i++){
+  c.atlas[SNAKE_OCC+i]=0u;c.atlas[SNAKE_BODY+i]=0u;
+ }
+ snakeSet(SM_MAGIC,SNAKE_MAGIC);snakeSet(SM_STATUS,status);
+ snakeSet(SM_HEAD,3u);snakeSet(SM_TAIL,0u);snakeSet(SM_LENGTH,4u);
+ snakeSet(SM_BEST,best);snakeSet(SM_RNG,seed==0u?0x91e10da5u:seed);
+ snakeSet(SM_CONNECTED,snakePadConnected()?1u:0u);
+ for(uint i=0u;i<4u;i++){
+  uint cell=10u*SNAKE_W+12u+i;
+  c.atlas[SNAKE_BODY+i]=cell;c.atlas[SNAKE_OCC+cell]=1u;
+ }
+ snakePlaceFood();
+}
+void snakePause(uint reason){
+ snakeSet(SM_STATUS,SNAKE_PAUSED);snakeSet(SM_PAUSE_REASON,reason);
+ snakeSet(SM_CREDIT,0u);snakeSet(SM_TURN_LOCK,0u);
+ snakeSet(SM_QUEUED,snakeDirection());
+}
+void snakeStep(){
+ uint direction=snakeWord(SM_QUEUED);snakeSet(SM_DIRECTION,direction);
+ snakeSet(SM_TURN_LOCK,0u);
+ uint head=snakeHeadCell();ivec2 p=ivec2(int(head%SNAKE_W),int(head/SNAKE_W));
+ if(direction==0u)p.x++;else if(direction==1u)p.y++;
+ else if(direction==2u)p.x--;else p.y--;
+ if(p.x<0||p.y<0||p.x>=int(SNAKE_W)||p.y>=int(SNAKE_H)){
+  snakeSet(SM_STATUS,SNAKE_DEAD);return;
+ }
+ uint next=uint(p.y)*SNAKE_W+uint(p.x),tailIndex=snakeWord(SM_TAIL);
+ uint tail=c.atlas[SNAKE_BODY+tailIndex];bool grows=next==snakeFoodCell();
+ // The current tail is legal only when it moves away during this tick.
+ if(c.atlas[SNAKE_OCC+next]!=0u&&(grows||next!=tail)){
+  snakeSet(SM_STATUS,SNAKE_DEAD);return;
+ }
+ if(!grows){
+  c.atlas[SNAKE_OCC+tail]=0u;snakeSet(SM_TAIL,(tailIndex+1u)%SNAKE_CELLS);
+ }else snakeSet(SM_LENGTH,snakeLength()+1u);
+ uint headIndex=(snakeWord(SM_HEAD)+1u)%SNAKE_CELLS;
+ snakeSet(SM_HEAD,headIndex);c.atlas[SNAKE_BODY+headIndex]=next;
+ c.atlas[SNAKE_OCC+next]=1u;
+ if(grows){
+  snakeSet(SM_SCORE,snakeScore()+10u);snakeSet(SM_BEST,max(snakeBest(),snakeScore()));
+  snakePlaceFood();
+ }
+}
+void main(){
+ // One workgroup is dispatched, and this guard also prevents an accidental
+ // larger dispatch from creating concurrent game-state writers.
+ if(any(notEqual(gl_GlobalInvocationID,uvec3(0u))))return;
+ c.motion.x+=1.0/60.0;c.state.z++;
+ c.transition.x=max(0.0,c.transition.x-1.0/15.0);
+ if(snakeWord(SM_MAGIC)!=SNAKE_MAGIC){
+  snakeReset(SNAKE_READY,0u,0x91e10da5u^c.state.z);hbEndFrame();return;
+ }
+ uint pressed=hbPressed();bool connected=snakePadConnected();
+ snakeSet(SM_CONNECTED,connected?1u:0u);
+ if(connected&&(pressed&(HB_B|HB_MINUS))!=0u){hbExit();hbEndFrame();return;}
+ if(!connected){
+  if(snakeStatus()==SNAKE_RUNNING)snakePause(1u);
+  hbEndFrame();return;
+ }
+ uint status=snakeStatus();
+ if(status==SNAKE_READY||status==SNAKE_DEAD||status==SNAKE_WON){
+  if((pressed&HB_A)!=0u)snakeReset(SNAKE_RUNNING,snakeBest(),snakeWord(SM_RNG)^c.state.z);
+  hbEndFrame();return;
+ }
+ if(status==SNAKE_PAUSED){
+  if((pressed&(HB_A|HB_PLUS|HB_X))!=0u){
+   snakeSet(SM_STATUS,SNAKE_RUNNING);snakeSet(SM_PAUSE_REASON,0u);
+   snakeSet(SM_CREDIT,0u);snakeSet(SM_TURN_LOCK,0u);snakeSet(SM_QUEUED,snakeDirection());
+  }
+  hbEndFrame();return;
+ }
+ if((pressed&(HB_PLUS|HB_X))!=0u){snakePause(0u);hbEndFrame();return;}
+ uint wanted=snakeInputDirection(pressed),current=snakeDirection();
+ if(snakeWord(SM_TURN_LOCK)==0u&&wanted<4u&&wanted!=current&&wanted!=((current+2u)%4u)){
+  snakeSet(SM_QUEUED,wanted);snakeSet(SM_TURN_LOCK,1u);
+ }
+ // Rational frame pacing: eight moves per 60 frames initially. A dispatch
+ // advances at most one grid cell; missed host frames never cause catch-up.
+ uint credit=snakeWord(SM_CREDIT)+snakeSpeed();
+ if(credit>=60u){snakeSet(SM_CREDIT,credit-60u);snakeStep();}
+ else snakeSet(SM_CREDIT,credit);
+ hbEndFrame();
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "magic": 1178751537,
+  "request": {"op": 5, "list": 1, "preview": 2, "hexPreview": 3, "pathMaxBytes": 740, "pathLengthArgument": "c"},
+  "atlas": {"offset": 3145728, "width": 2048, "height": 1024, "format": "L8", "visibleWidth": 1800},
+  "metadata": {"offset": 2621440, "bytes": 16384, "pathOffset": 128, "errorOffset": 896, "entriesOffset": 1024, "entryStride": 1024, "entryNameOffset": 32},
+  "controlOffset": 2637824,
+  "pageRows": 12,
+  "previewPageBytes": 512,
+  "text": {"pathY": 0, "summaryY": 64, "rowsY": 128, "rowHeight": 64, "footerY": 928}
+}

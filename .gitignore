@@ -11,3 +11,8 @@ __pycache__/
 /homebrew-launcher/game-render
 
 /dist/
+
+# Local archives and generated second ROM package are not source releases.
+/*.zip
+*.nes
+/apps/nes-2/

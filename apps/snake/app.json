@@ -1,0 +1,17 @@
+{
+  "format": "hblauncher.gpu-app",
+  "abi": 1,
+  "id": "snake",
+  "name": "Snake",
+  "version": "1.0.0",
+  "description": "A little snake, a big appetite. D-pad or left stick to play.",
+  "icon": "assets/icon.png",
+  "initialState": "assets/state.bin",
+  "data": "assets/text.bin",
+  "shaders": {
+    "vertex": "app.vert.spv",
+    "fragment": "app.frag.spv",
+    "compute": "app.comp.spv"
+  },
+  "sdk": {"version": 1, "capabilities": []}
+}

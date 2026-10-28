@@ -1,12 +1,12 @@
 """Rasterize package labels/icons into a fixed GPU catalog buffer."""
-import json, struct, sys
+import json, os, struct, sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-apps=json.loads(Path(sys.argv[1]).read_text())
+apps=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
 assert len(apps)<=32
 slots=bytearray(32*131072)
-font='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+font=os.environ.get('HB_FONT','/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
 for i,app in enumerate(apps):
     image=Image.new('L',(512,128)); draw=ImageDraw.Draw(image); sizes=[]
     for text,size,y in [(app['name'],34,0),(app['description'],18,64)]:

@@ -1,0 +1,8 @@
+/assets/
+/app.json
+/rom-info.json
+/*.spv
+/tests/generated-cpu/
+/tests/.ppu-test-output/
+*.nes
+__pycache__/

@@ -1,5 +1,11 @@
 const os=require('node:os'),net=require('node:net');
 const port=39380;
+function hostOptions(args) {
+  const manual = args.includes('--manual');
+  if (args.filter(arg => arg === '--manual').length > 1)
+    throw Error('Pass --manual only once.');
+  return {manual, args: args.filter(arg => arg !== '--manual')};
+}
 function addresses(interfaces = os.networkInterfaces()) {
   return [...new Set(Object.values(interfaces).flat().filter(a =>
     a.family === 'IPv4' && !a.internal && a.netmask !== '255.255.255.255' &&
@@ -8,7 +14,7 @@ function addresses(interfaces = os.networkInterfaces()) {
 
 async function chooseHost(args) {
   if (args.length > 1 || args.length === 1 && !net.isIPv4(args[0]))
-    throw Error('Usage: ./start.sh [computer-IP]');
+    throw Error('Usage: node homebrew-launcher/start-launcher.cjs [--manual] [computer-IP]');
   if (args.length) return args[0];
   const choices = addresses();
   if (choices.length === 1) return choices[0];
@@ -28,4 +34,4 @@ function connectCommand(host, token) {
   return `V=START(${[port, ...host.split('.'), ...token].join(',')})`;
 }
 
-module.exports={addresses,chooseHost,connectCommand};
+module.exports={addresses,chooseHost,connectCommand,hostOptions};

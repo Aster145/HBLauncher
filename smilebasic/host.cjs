@@ -1,24 +1,38 @@
 #!/usr/bin/env node
 const fs = require('node:fs/promises');
+const {writeFileSync} = require('node:fs');
 const path = require('node:path');
-const {chooseHost, connectCommand} = require('./connection.cjs');
+const {chooseHost, connectCommand, hostOptions} = require('./connection.cjs');
 const {pairingCode, listen} = require('./engine/lib/connection.cjs');
 const {NativeClient} = require('./engine/lib/native.cjs');
 const {qualify} = require('./engine/lib/qualify.cjs');
 const {serve} = require('./engine/lib/bridge.cjs');
 
 async function main() {
-  const host = await chooseHost(process.argv.slice(2)), token = pairingCode();
+  const options = hostOptions(process.argv.slice(2));
+  const host = await chooseHost(options.args), token = pairingCode();
+  const command = connectCommand(host, token);
   await fs.mkdir(path.join(__dirname, '../runs'), {recursive:true, mode:0o700});
   const directory = await fs.mkdtemp(path.join(__dirname, '../runs/launcher-'));
   const record = {started: new Date().toISOString(), purpose: 'HBLauncher SmileBASIC session'};
   let native, pico, bridge;
   try {
-    const key = (await fs.readFile(path.join(__dirname, 'pico-keyboard/secret'), 'utf8')).trim();
-    pico = await require('./pico-keyboard/host.cjs').start({host, command: connectCommand(host, token), key,
-      onStatus: console.log});
+    if (!options.manual) {
+      const key = (await fs.readFile(path.join(__dirname, 'pico-keyboard/secret'), 'utf8')).trim();
+      pico = await require('./pico-keyboard/host.cjs').start({host, command, key, onStatus: console.log});
+    }
     const connected = await listen({host, port: 39380, token, onRejected: console.error,
-      onWaiting() {console.log('Graphics listener ready. Reconnect the Pico in fresh SmileBASIC Direct mode.');
+      onWaiting() {
+        writeFileSync(path.join(directory, 'connect.txt'), command + '\n', {mode: 0o600});
+        if (options.manual) {
+          console.log('Graphics listener ready. Manual / external keyboard mode; no Pico pairing service.');
+          console.log('Use fresh SmileBASIC Direct mode. Load the saved NS2 and confirm its dialog:');
+          console.log('LOAD "TXT:NS2"');
+          console.log('RUN');
+          console.log('REMOVE NSR,&H60000000,&H3FFFFFFF');
+          console.log('The handled REMOVE error is expected. Then enter this fresh session command:');
+          console.log(command);
+        } else console.log('Graphics listener ready. Reconnect the Pico in fresh SmileBASIC Direct mode.');
         console.log('Run folder: ' + directory);}});
     native = new NativeClient(connected.connection, connected.addresses);
     record.qualification = await qualify(native);

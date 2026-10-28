@@ -1,0 +1,2 @@
+Source-only NES app. Build with your own ROM to generate app.json and the local
+package. The launcher skips this folder until app.json exists.

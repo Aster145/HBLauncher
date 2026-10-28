@@ -58,7 +58,9 @@ request services, add:
 }
 ```
 
-Supported capabilities are exactly `vibration`, `nfc` and `udp`. Endpoint
+Supported capabilities are `vibration`, `nfc`, `udp` and the local `files-read`
+extension. `files-read` is restricted to the Files app; see
+[file-browser.md](file-browser.md) for its read-only mounts and view protocol. Endpoint
 addresses must be IPv4 literals with ports 1–65535; at most eight endpoints are
 allowed. DNS names are not accepted. `validateManifest()` is called by the
 catalog before a package is admitted. The host rejects undeclared requests.
@@ -71,7 +73,7 @@ Request at extension offset 2048:
 | Relative offset | u32 field |
 | --- | --- |
 | 0 | Nonzero sequence, incremented for each request |
-| 4 | Operation: 1 vibration, 2 NFC, 3 UDP, 4 haptic envelope |
+| 4 | Operation: 1 vibration, 2 NFC, 3 UDP, 4 haptic envelope, 5 local Files read |
 | 8 | Argument A |
 | 12 | Argument B |
 | 16 | Argument C |
